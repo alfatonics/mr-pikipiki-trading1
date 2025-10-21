@@ -110,6 +110,8 @@ JWT_SECRET=MrPikipiki_Secret_Key_2024_Please_Change_In_Production
 mongodb+srv://mrpikipiki:bp2kOzatPLUW5RfG@mrpikipiki.zqt65e1.mongodb.net/mr-pikipiki-trading?retryWrites=true&w=majority&appName=mrpikipiki
 ```
 
+mongodb+srv://mrpikipiki:bp2kOzatPLUW5RfG@mrpikipiki.zqt65e1.mongodb.net/mr-pikipiki-trading?retryWrites=true&w=majority&appName=mrpikipiki
+
 **Use this in:**
 - Local .env file (for development)
 - Vercel environment variables (for deployment)
