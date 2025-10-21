@@ -50,6 +50,26 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'MR PIKIPIKI TRADING API is running' });
 });
 
+// Test endpoint to verify database connection and user
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const User = mongoose.model('User');
+    const userCount = await User.countDocuments();
+    const adminUser = await User.findOne({ username: 'admin' });
+    
+    res.json({
+      dbConnected: mongoose.connection.readyState === 1,
+      databaseName: mongoose.connection.name,
+      userCount,
+      adminExists: !!adminUser,
+      adminUsername: adminUser?.username,
+      adminRole: adminUser?.role
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
