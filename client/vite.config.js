@@ -6,7 +6,10 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0', // Listen on all network interfaces
-    allowedHosts: ['all'],
+    allowedHosts: [
+      '.ngrok-free.app',
+      '.ngrok.io'
+    ],
     hmr: {
       clientPort: 443 // For tunnels
     },
@@ -19,5 +22,3 @@ export default defineConfig({
     }
   }
 })
-
-
