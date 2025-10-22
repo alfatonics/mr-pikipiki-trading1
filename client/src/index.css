@@ -10,10 +10,22 @@
 
 /* Base font size adjustments for better mobile readability */
 html {
-  font-size: 14px;
+  font-size: 12px;
+}
+
+@media (min-width: 480px) {
+  html {
+    font-size: 13px;
+  }
 }
 
 @media (min-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 768px) {
   html {
     font-size: 16px;
   }

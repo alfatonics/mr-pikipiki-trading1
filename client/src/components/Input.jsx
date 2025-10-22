@@ -7,7 +7,7 @@ const Input = ({ label, error, className = 'mb-4', ...props }) => {
         </label>
       )}
       <input
-        className={`w-full px-3 py-2 sm:px-4 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+        className={`w-full px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
           error ? 'border-red-500' : 'border-gray-300'
         }`}
         {...props}
