@@ -114,15 +114,17 @@ const Customers = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => handleEdit(row)}
-            className="text-blue-600 hover:text-blue-800"
+            className="text-blue-600 hover:text-blue-800 p-1 sm:p-0"
+            title="Edit"
           >
-            <FiEdit />
+            <FiEdit className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <button
             onClick={() => handleDelete(row._id)}
-            className="text-red-600 hover:text-red-800"
+            className="text-red-600 hover:text-red-800 p-1 sm:p-0"
+            title="Delete"
           >
-            <FiTrash2 />
+            <FiTrash2 className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       )
@@ -131,11 +133,11 @@ const Customers = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
-        <Button onClick={() => setModalOpen(true)}>
-          <FiPlus className="inline mr-2" />
-          Add Customer
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Customers</h1>
+        <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
+          <FiPlus className="inline mr-1 sm:mr-2 w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="text-sm sm:text-base">Add Customer</span>
         </Button>
       </div>
 

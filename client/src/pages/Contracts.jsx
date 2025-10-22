@@ -277,30 +277,30 @@ const Contracts = () => {
             <span className="text-sm sm:text-base">Create Contract</span>
           </Button>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           <Button 
             variant={filter === 'all' ? 'primary' : 'outline'} 
             size="sm"
             onClick={() => setFilter('all')}
-            className="flex-1 sm:flex-none"
+            className="flex-1 min-w-0 sm:flex-none sm:min-w-auto"
           >
-            All
+            <span className="text-xs sm:text-sm">All</span>
           </Button>
           <Button 
             variant={filter === 'purchase' ? 'primary' : 'outline'} 
             size="sm"
             onClick={() => setFilter('purchase')}
-            className="flex-1 sm:flex-none"
+            className="flex-1 min-w-0 sm:flex-none sm:min-w-auto"
           >
-            Purchase
+            <span className="text-xs sm:text-sm">Purchase</span>
           </Button>
           <Button 
             variant={filter === 'sale' ? 'primary' : 'outline'} 
             size="sm"
             onClick={() => setFilter('sale')}
-            className="flex-1 sm:flex-none"
+            className="flex-1 min-w-0 sm:flex-none sm:min-w-auto"
           >
-            Sales
+            <span className="text-xs sm:text-sm">Sales</span>
           </Button>
         </div>
       </div>
