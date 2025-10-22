@@ -63,29 +63,29 @@ const TableWithSearch = ({ columns, data, onRowClick, searchKeys = [] }) => {
     <div>
       {/* Search Bar */}
       {searchKeys.length > 0 && (
-        <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
+        <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative flex-1 min-w-[200px] max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <FiSearch className="text-gray-400" />
+              <FiSearch className="text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <input
               type="text"
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           
           <div className="flex items-center space-x-2">
-            <label className="text-sm text-gray-600">Show:</label>
+            <label className="text-xs sm:text-sm text-gray-600">Show:</label>
             <select
               value={itemsPerPage}
               onChange={(e) => {
                 setItemsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+              className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-xs sm:text-sm"
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
@@ -99,113 +99,117 @@ const TableWithSearch = ({ columns, data, onRowClick, searchKeys = [] }) => {
 
       {/* Results Info */}
       {searchKeys.length > 0 && (
-        <div className="mb-2 text-sm text-gray-600">
+        <div className="mb-2 text-xs sm:text-sm text-gray-600">
           Showing {currentData.length} of {filteredData.length} {searchTerm ? 'filtered' : ''} results
           {filteredData.length !== data.length && ` (${data.length} total)`}
         </div>
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                #
-              </th>
-              {columns.map((column, index) => (
-                <th
-                  key={index}
-                  className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  {column.header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {currentData.length === 0 ? (
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="inline-block min-w-full align-middle">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td
-                  colSpan={columns.length + 1}
-                  className="px-6 py-8 text-center text-gray-500"
-                >
-                  {searchTerm ? `No results found for "${searchTerm}"` : 'No data available'}
-                </td>
+                <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12 sm:w-16">
+                  #
+                </th>
+                {columns.map((column, index) => (
+                  <th
+                    key={index}
+                    className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    {column.header}
+                  </th>
+                ))}
               </tr>
-            ) : (
-              currentData.map((row, rowIndex) => (
-                <tr
-                  key={rowIndex}
-                  onClick={() => onRowClick && onRowClick(row)}
-                  className={onRowClick ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}
-                >
-                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm text-gray-500 font-medium">
-                    {startIndex + rowIndex + 1}
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currentData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={columns.length + 1}
+                    className="px-3 py-6 sm:px-6 sm:py-8 text-center text-xs sm:text-sm text-gray-500"
+                  >
+                    {searchTerm ? `No results found for "${searchTerm}"` : 'No data available'}
                   </td>
-                  {columns.map((column, colIndex) => (
-                    <td key={colIndex} className="px-4 md:px-6 py-3 md:py-4 text-sm">
-                      {column.render ? column.render(row) : row[column.accessor]}
-                    </td>
-                  ))}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                currentData.map((row, rowIndex) => (
+                  <tr
+                    key={rowIndex}
+                    onClick={() => onRowClick && onRowClick(row)}
+                    className={onRowClick ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}
+                  >
+                    <td className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 text-xs sm:text-sm text-gray-500 font-medium">
+                      {startIndex + rowIndex + 1}
+                    </td>
+                    {columns.map((column, colIndex) => (
+                      <td key={colIndex} className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 text-xs sm:text-sm">
+                        {column.render ? column.render(row) : row[column.accessor]}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
-          <div className="text-sm text-gray-600">
+        <div className="mt-3 sm:mt-4 flex items-center justify-between flex-wrap gap-3">
+          <div className="text-xs sm:text-sm text-gray-600">
             Page {currentPage} of {totalPages}
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             {/* Previous Button */}
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`p-2 rounded-lg ${
+              className={`p-1.5 sm:p-2 rounded-lg ${
                 currentPage === 1
                   ? 'text-gray-400 cursor-not-allowed'
                   : 'text-primary-600 hover:bg-primary-50'
               }`}
             >
-              <FiChevronLeft />
+              <FiChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             
             {/* Page Numbers */}
-            {renderPageNumbers().map((page, index) => (
-              page === '...' ? (
-                <span key={`ellipsis-${index}`} className="px-2 text-gray-400">...</span>
-              ) : (
-                <button
-                  key={page}
-                  onClick={() => goToPage(page)}
-                  className={`px-3 py-1 rounded-lg text-sm ${
-                    currentPage === page
-                      ? 'bg-primary-600 text-white font-medium'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  {page}
-                </button>
-              )
-            ))}
+            <div className="flex items-center space-x-0.5 sm:space-x-1">
+              {renderPageNumbers().map((page, index) => (
+                page === '...' ? (
+                  <span key={`ellipsis-${index}`} className="px-1 sm:px-2 text-gray-400 text-xs sm:text-sm">...</span>
+                ) : (
+                  <button
+                    key={page}
+                    onClick={() => goToPage(page)}
+                    className={`px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm ${
+                      currentPage === page
+                        ? 'bg-primary-600 text-white font-medium'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )
+              ))}
+            </div>
             
             {/* Next Button */}
             <button
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`p-2 rounded-lg ${
+              className={`p-1.5 sm:p-2 rounded-lg ${
                 currentPage === totalPages
                   ? 'text-gray-400 cursor-not-allowed'
                   : 'text-primary-600 hover:bg-primary-50'
               }`}
             >
-              <FiChevronRight />
+              <FiChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>

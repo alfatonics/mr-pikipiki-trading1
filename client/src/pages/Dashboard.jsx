@@ -70,9 +70,9 @@ const Dashboard = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Welcome back, {user?.fullName}!</p>
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-sm sm:text-base text-gray-600 mt-1">Welcome back, {user?.fullName}!</p>
       </div>
       {renderDashboard()}
     </div>
@@ -116,12 +116,12 @@ const MechanicDashboard = ({ stats }) => {
       </div>
 
       {/* Mechanic Info Card */}
-      <Card className="mb-6 bg-blue-50 border-blue-200">
-        <div className="flex items-start space-x-3">
-          <FiAlertCircle className="text-blue-600 text-xl mt-1" />
+      <Card className="mb-4 sm:mb-6 bg-blue-50 border-blue-200">
+        <div className="flex items-start space-x-2 sm:space-x-3">
+          <FiAlertCircle className="text-blue-600 text-lg sm:text-xl mt-1 flex-shrink-0" />
           <div>
-            <h3 className="font-semibold text-blue-900">Your Workflow</h3>
-            <p className="text-sm text-blue-800 mt-1">
+            <h3 className="font-semibold text-sm sm:text-base text-blue-900">Your Workflow</h3>
+            <p className="text-xs sm:text-sm text-blue-800 mt-1">
               1. View assigned repairs in <strong>Repairs</strong> page<br />
               2. Start work and update status<br />
               3. Register repair details (parts, labor, costs)<br />
@@ -133,20 +133,20 @@ const MechanicDashboard = ({ stats }) => {
       </Card>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <Card>
-          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-          <div className="space-y-3">
-            <a href="/my-jobs" className="block p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Quick Actions</h2>
+          <div className="space-y-2 sm:space-y-3">
+            <a href="/my-jobs" className="block p-3 sm:p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-primary-900">My Repair Jobs</p>
-                  <p className="text-sm text-primary-700">Work on assigned repairs</p>
+                  <p className="font-medium text-sm sm:text-base text-primary-900">My Repair Jobs</p>
+                  <p className="text-xs sm:text-sm text-primary-700">Work on assigned repairs</p>
                 </div>
-                <FiTool className="text-primary-600 text-2xl" />
+                <FiTool className="text-primary-600 text-xl sm:text-2xl flex-shrink-0" />
               </div>
             </a>
-            <a href="/my-requests" className="block p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
+            <a href="/my-requests" className="block p-3 sm:p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium text-blue-900">My Approval Requests</p>

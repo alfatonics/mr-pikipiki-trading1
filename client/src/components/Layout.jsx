@@ -40,29 +40,29 @@ const Layout = () => {
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-primary-800 to-primary-900 text-white transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
-        <div className="flex items-center justify-between p-6 border-b border-primary-700">
-          <div className="flex items-center space-x-3 flex-1">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-primary-700">
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
             {/* Company Logo */}
             <img 
               src="/logo.png" 
               alt="Logo" 
-              className="h-12 w-12 object-contain"
+              className="h-10 w-10 sm:h-12 sm:w-12 object-contain flex-shrink-0"
               onError={(e) => e.target.style.display = 'none'}
             />
-            <div>
-              <h1 className="text-xl font-bold">MR PIKIPIKI</h1>
-              <p className="text-xs text-primary-200">Trading Management</p>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold truncate">MR PIKIPIKI</h1>
+              <p className="text-xs text-primary-200 truncate">Trading Management</p>
             </div>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-white hover:text-primary-200"
+            className="lg:hidden text-white hover:text-primary-200 flex-shrink-0"
           >
-            <FiX size={24} />
+            <FiX className="w-6 h-6" />
           </button>
         </div>
 
-        <nav className="mt-6 px-4">
+        <nav className="mt-4 sm:mt-6 px-3 sm:px-4">
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -72,34 +72,34 @@ const Layout = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center space-x-3 px-4 py-3 mb-2 rounded-lg transition-all ${
+                className={`flex items-center space-x-2 sm:space-x-3 px-3 py-2.5 sm:px-4 sm:py-3 mb-1.5 sm:mb-2 rounded-lg transition-all ${
                   isActive
                     ? 'bg-white text-primary-900 shadow-lg'
                     : 'text-primary-100 hover:bg-primary-700 hover:text-white'
                 }`}
               >
-                <Icon size={20} />
-                <span className="font-medium">{item.label}</span>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <span className="font-medium text-sm sm:text-base">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="absolute bottom-0 w-64 p-4 border-t border-primary-700">
-          <div className="flex items-center space-x-3 mb-3 px-2">
-            <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center">
-              <span className="text-lg font-bold">{user?.fullName?.charAt(0)}</span>
+        <div className="absolute bottom-0 w-64 p-3 sm:p-4 border-t border-primary-700">
+          <div className="flex items-center space-x-2 sm:space-x-3 mb-2 sm:mb-3 px-1 sm:px-2">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-base sm:text-lg font-bold">{user?.fullName?.charAt(0)}</span>
             </div>
-            <div className="flex-1">
-              <p className="font-medium text-sm">{user?.fullName}</p>
-              <p className="text-xs text-primary-300 capitalize">{user?.role}</p>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-xs sm:text-sm truncate">{user?.fullName}</p>
+              <p className="text-xs text-primary-300 capitalize truncate">{user?.role}</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-2 w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+            className="flex items-center justify-center space-x-2 w-full px-3 py-2 sm:px-4 sm:py-2.5 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-sm sm:text-base"
           >
-            <FiLogOut size={18} />
+            <FiLogOut className="w-4 h-4 sm:w-5 sm:h-5" />
             <span>Logout</span>
           </button>
         </div>
@@ -108,16 +108,16 @@ const Layout = () => {
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 overflow-auto">
         {/* Top Bar */}
-        <div className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+        <div className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden text-gray-600 hover:text-gray-900"
             >
-              <FiMenu size={24} />
+              <FiMenu className="w-6 h-6" />
             </button>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline">
                 {new Date().toLocaleDateString('en-US', { 
                   weekday: 'long', 
                   year: 'numeric', 
@@ -125,12 +125,19 @@ const Layout = () => {
                   day: 'numeric' 
                 })}
               </span>
+              <span className="text-xs text-gray-600 sm:hidden">
+                {new Date().toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Page Content */}
-        <main className="p-6">
+        <main className="p-4 sm:p-6">
           <Outlet />
         </main>
       </div>
