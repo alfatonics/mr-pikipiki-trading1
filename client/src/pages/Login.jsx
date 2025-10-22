@@ -38,7 +38,7 @@ const Login = () => {
               <img 
                 src="/logo.png" 
                 alt="MR PIKIPIKI TRADING" 
-                className="mx-auto h-12 sm:h-20 md:h-24 w-auto"
+                className="mx-auto h-16 sm:h-24 md:h-32 w-auto"
                 onError={(e) => {
                   // If logo doesn't exist, hide image and show text instead
                   e.target.style.display = 'none';
@@ -69,7 +69,6 @@ const Login = () => {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
                 required
                 className="mb-2 sm:mb-4"
               />
@@ -84,7 +83,6 @@ const Login = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
                 required
                 className="mb-3 sm:mb-6"
               />
