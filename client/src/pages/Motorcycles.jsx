@@ -149,27 +149,27 @@ const Motorcycles = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => handleEdit(row)}
-            className="text-blue-600 hover:text-blue-800"
+            className="text-blue-600 hover:text-blue-800 p-1 sm:p-0"
             title="Edit"
           >
-            <FiEdit />
+            <FiEdit className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           {row.status === 'in_stock' && (
             <button
               onClick={() => window.open(`/contracts?create=sale&motorcycle=${row._id}`, '_blank')}
-              className="text-green-600 hover:text-green-800"
+              className="text-green-600 hover:text-green-800 p-1 sm:p-0"
               title="Create Sale Contract"
             >
-              <FiFileText />
+              <FiFileText className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
           <button
             onClick={() => handleDelete(row._id)}
-            className="text-red-600 hover:text-red-800"
+            className="text-red-600 hover:text-red-800 p-1 sm:p-0"
             title="Delete"
           >
-            <FiTrash2 />
-          </button>
+            <FiTrash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+</button>
         </div>
       )
     }
@@ -177,11 +177,11 @@ const Motorcycles = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Motorcycles</h1>
-        <Button onClick={() => setModalOpen(true)}>
-          <FiPlus className="inline mr-2" />
-          Add Motorcycle
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Motorcycles</h1>
+        <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
+          <FiPlus className="inline mr-1 sm:mr-2 w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="text-sm sm:text-base">Add Motorcycle</span>
         </Button>
       </div>
 
@@ -200,7 +200,7 @@ const Motorcycles = () => {
         size="lg"
       >
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input
               label="Chassis Number"
               value={formData.chassisNumber}
@@ -292,11 +292,11 @@ const Motorcycles = () => {
               rows="3"
             />
           </div>
-          <div className="mt-6 flex justify-end space-x-3">
-            <Button type="button" variant="secondary" onClick={handleCloseModal}>
+          <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+            <Button type="button" variant="secondary" onClick={handleCloseModal} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit">
+            <Button type="submit" className="w-full sm:w-auto">
               {editingMotorcycle ? 'Update' : 'Create'}
             </Button>
           </div>

@@ -248,18 +248,18 @@ const Contracts = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => handleDownloadPDF(row._id, row.contractNumber)}
-            className="text-blue-600 hover:text-blue-800"
+            className="text-blue-600 hover:text-blue-800 p-1 sm:p-0"
             title="Download PDF"
           >
-            <FiDownload />
+            <FiDownload className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           {!row.printedAt && (
             <button
               onClick={() => handleMarkPrinted(row._id)}
-              className="text-green-600 hover:text-green-800"
+              className="text-green-600 hover:text-green-800 p-1 sm:p-0"
               title="Mark as Printed"
             >
-              <FiEye />
+              <FiEye className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
         </div>
@@ -269,17 +269,20 @@ const Contracts = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Contracts</h1>
-        <div className="flex space-x-2">
-          <Button onClick={() => setModalOpen(true)}>
-            <FiPlus className="inline mr-2" />
-            Create Contract
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Contracts</h1>
+          <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
+            <FiPlus className="inline mr-1 sm:mr-2 w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base">Create Contract</span>
           </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
           <Button 
             variant={filter === 'all' ? 'primary' : 'outline'} 
             size="sm"
             onClick={() => setFilter('all')}
+            className="flex-1 sm:flex-none"
           >
             All
           </Button>
@@ -287,6 +290,7 @@ const Contracts = () => {
             variant={filter === 'purchase' ? 'primary' : 'outline'} 
             size="sm"
             onClick={() => setFilter('purchase')}
+            className="flex-1 sm:flex-none"
           >
             Purchase
           </Button>
@@ -294,6 +298,7 @@ const Contracts = () => {
             variant={filter === 'sale' ? 'primary' : 'outline'} 
             size="sm"
             onClick={() => setFilter('sale')}
+            className="flex-1 sm:flex-none"
           >
             Sales
           </Button>
@@ -315,7 +320,7 @@ const Contracts = () => {
         size="lg"
       >
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Select
               label="Contract Type"
               value={formData.type}
@@ -376,9 +381,9 @@ const Contracts = () => {
           </div>
 
           {formData.paymentMethod === 'installment' && (
-            <div className="mt-4">
-              <h3 className="text-lg font-semibold mb-3">Installment Details</h3>
-              <div className="grid grid-cols-3 gap-4">
+            <div className="mt-3 sm:mt-4">
+              <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Installment Details</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <Input
                   label="Down Payment (TZS)"
                   type="number"
@@ -419,22 +424,22 @@ const Contracts = () => {
             </div>
           )}
 
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Terms and Conditions</label>
+          <div className="mt-3 sm:mt-4">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Terms and Conditions</label>
             <textarea
               value={formData.terms}
               onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               rows="4"
               placeholder="Enter contract terms and conditions..."
             />
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
-            <Button type="button" variant="secondary" onClick={handleCloseModal}>
+          <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+            <Button type="button" variant="secondary" onClick={handleCloseModal} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit">
+            <Button type="submit" className="w-full sm:w-auto">
               Create Contract
             </Button>
           </div>
