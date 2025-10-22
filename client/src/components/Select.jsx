@@ -1,6 +1,6 @@
-const Select = ({ label, error, options = [], className = '', ...props }) => {
+const Select = ({ label, error, options = [], className = 'mb-4', ...props }) => {
   return (
-    <div className={`mb-4 ${className}`}>
+    <div className={className}>
       {label && (
         <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
           {label}

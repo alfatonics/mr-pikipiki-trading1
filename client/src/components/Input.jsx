@@ -1,6 +1,6 @@
-const Input = ({ label, error, className = '', ...props }) => {
+const Input = ({ label, error, className = 'mb-4', ...props }) => {
   return (
-    <div className={`mb-4 ${className}`}>
+    <div className={className}>
       {label && (
         <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
           {label}
