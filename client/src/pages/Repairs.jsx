@@ -9,7 +9,7 @@ import Select from '../components/Select';
 import TableWithSearch from '../components/TableWithSearch';
 import { 
   FiPlus, FiEdit, FiCheck, FiPlay, FiCheckCircle, FiXCircle, 
-  FiClipboard, FiClock, FiEye, FiX, FiTool, FiWrench 
+  FiClipboard, FiClock, FiEye, FiX, FiTool 
 } from 'react-icons/fi';
 
 const Repairs = () => {
@@ -372,7 +372,7 @@ const Repairs = () => {
   const EmptyState = () => (
     <div className="text-center py-12 px-4">
       <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-        <FiWrench className="w-12 h-12 text-gray-400" />
+        <FiTool className="w-12 h-12 text-gray-400" />
       </div>
       <h3 className="text-lg font-medium text-gray-900 mb-2">No repairs yet</h3>
       <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
