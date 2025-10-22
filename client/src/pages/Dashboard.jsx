@@ -3,11 +3,14 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import StatCard from '../components/StatCard';
 import Card from '../components/Card';
+import ModernChart from '../components/ModernChart';
+import InventoryWidget from '../components/InventoryWidget';
+import NotificationTester from '../components/NotificationTester';
 import { 
   FiPackage, FiDollarSign, FiTrendingUp, FiUsers, 
-  FiTruck, FiTool, FiCheckCircle, FiClock, FiAlertCircle
+  FiTruck, FiTool, FiCheckCircle, FiClock, FiAlertCircle,
+  FiActivity, FiTrendingDown, FiArrowUp, FiArrowDown
 } from 'react-icons/fi';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -69,12 +72,38 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm sm:text-base text-gray-600 mt-1">Welcome back, {user?.fullName}!</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Modern Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans">Dashboard</h1>
+            <p className="text-gray-600">Welcome back, <span className="font-semibold text-gray-900">{user?.fullName}</span>!</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Today</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  month: 'short', 
+                  day: 'numeric' 
+                })}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-      {renderDashboard()}
+
+      {/* Main Content */}
+      <div className="p-4">
+        {renderDashboard()}
+        
+        {/* Notification Testing Section - Always Visible */}
+        <div className="mt-8">
+          <NotificationTester />
+        </div>
+      </div>
     </div>
   );
 };
@@ -197,7 +226,7 @@ const SalesDashboard = ({ stats, chartData }) => {
         />
         <StatCard
           title="Monthly Revenue"
-          value={`TZS ${(stats?.monthly?.revenue || 0).toLocaleString()}`}
+          value={`TZS ${(stats?.monthly?.revenue || 0).toLocaleString('en-US')}`}
           icon={FiDollarSign}
           color="info"
           subtitle="This month"
@@ -236,7 +265,7 @@ const SalesDashboard = ({ stats, chartData }) => {
                   <p className="text-sm text-gray-600">{sale.customer?.fullName || 'N/A'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-green-600">TZS {sale.sellingPrice?.toLocaleString()}</p>
+                  <p className="font-semibold text-green-600">TZS {sale.sellingPrice?.toLocaleString('en-US')}</p>
                   <p className="text-xs text-gray-500">
                     {new Date(sale.saleDate).toLocaleDateString()}
                   </p>
@@ -413,15 +442,31 @@ const SecretaryDashboard = ({ stats }) => {
 
 // Admin Dashboard (Full Access)
 const AdminDashboard = ({ stats, chartData }) => {
+  const salesChartData = chartData.map(item => ({
+    name: item.month,
+    value: item.sales,
+    revenue: item.revenue
+  }));
+
+  const inventoryData = {
+    inStock: stats?.motorcycles?.inStock || 0,
+    sold: stats?.motorcycles?.sold || 0,
+    inRepair: stats?.motorcycles?.inRepair || 0,
+    inTransit: stats?.motorcycles?.inTransit || 0
+  };
+
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
+      {/* Key Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         <StatCard
           title="Total Motorcycles"
           value={stats?.motorcycles?.total || 0}
           icon={FiPackage}
           color="primary"
           subtitle={`${stats?.motorcycles?.inStock || 0} in stock`}
+          trend="up"
+          trendValue="+12%"
         />
         <StatCard
           title="Monthly Sales"
@@ -429,103 +474,98 @@ const AdminDashboard = ({ stats, chartData }) => {
           icon={FiTrendingUp}
           color="success"
           subtitle="This month"
+          trend="up"
+          trendValue="+8%"
         />
         <StatCard
           title="Monthly Revenue"
-          value={`TZS ${(stats?.monthly?.revenue || 0).toLocaleString()}`}
+          value={`TZS ${(stats?.monthly?.revenue || 0).toLocaleString('en-US')}`}
           icon={FiDollarSign}
           color="info"
           subtitle="This month"
+          trend="up"
+          trendValue="+15%"
         />
         <StatCard
           title="Repair Expenses"
-          value={`TZS ${(stats?.repairs?.monthly || 0).toLocaleString()}`}
+          value={`TZS ${(stats?.repairs?.monthly || 0).toLocaleString('en-US')}`}
           icon={FiTool}
           color="danger"
           subtitle="This month"
+          trend="down"
+          trendValue="-5%"
         />
         <StatCard
           title="Total Customers"
           value={stats?.totalCustomers || 0}
           icon={FiUsers}
-          color="primary"
+          color="purple"
+          subtitle="Active customers"
+          trend="up"
+          trendValue="+3%"
         />
         <StatCard
           title="Pending Transports"
           value={stats?.pending?.transports || 0}
           icon={FiTruck}
           color="warning"
+          subtitle="Awaiting delivery"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <Card>
-          <h2 className="text-xl font-semibold mb-4">Monthly Sales Overview</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="sales" fill="#0ea5e9" name="Sales Count" />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-semibold mb-4">Inventory Status</h2>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">In Stock</span>
-              <span className="font-semibold text-green-600">{stats?.motorcycles?.inStock || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Sold</span>
-              <span className="font-semibold text-blue-600">{stats?.motorcycles?.sold || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">In Repair</span>
-              <span className="font-semibold text-yellow-600">{stats?.motorcycles?.inRepair || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">In Transit</span>
-              <span className="font-semibold text-purple-600">{stats?.motorcycles?.inTransit || 0}</span>
-            </div>
-          </div>
-        </Card>
+      {/* Charts and Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <ModernChart
+          data={salesChartData}
+          type="bar"
+          title="Monthly Sales Overview"
+          height={350}
+          colors={['#2563EB', '#10B981']}
+        />
+        <InventoryWidget data={inventoryData} />
       </div>
 
+      {/* Recent Activity and Top Performers */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <h2 className="text-xl font-semibold mb-4">Top Suppliers</h2>
-          <div className="space-y-3">
-            {stats?.topSuppliers?.map((supplier) => (
-              <div key={supplier._id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium">{supplier.name}</p>
-                  <p className="text-sm text-gray-600">{supplier.company || 'N/A'}</p>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Top Suppliers</h3>
+          <div className="space-y-4">
+            {stats?.topSuppliers?.map((supplier, index) => (
+              <div key={supplier._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                    {index + 1}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{supplier.name}</p>
+                    <p className="text-sm text-gray-600">{supplier.company || 'N/A'}</p>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold">{supplier.totalSupplied} units</p>
+                  <p className="font-semibold text-gray-900">{supplier.totalSupplied} units</p>
                   <p className="text-sm text-yellow-600">{'⭐'.repeat(supplier.rating)}</p>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
 
-        <Card>
-          <h2 className="text-xl font-semibold mb-4">Recent Sales</h2>
-          <div className="space-y-3">
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Sales</h3>
+          <div className="space-y-4">
             {stats?.recentSales?.map((sale) => (
-              <div key={sale._id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium">{sale.brand} {sale.model}</p>
-                  <p className="text-sm text-gray-600">{sale.customer?.fullName || 'N/A'}</p>
+              <div key={sale._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center">
+                    <FiPackage className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{sale.brand} {sale.model}</p>
+                    <p className="text-sm text-gray-600">{sale.customer?.fullName || 'N/A'}</p>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-green-600">TZS {sale.sellingPrice?.toLocaleString()}</p>
+                  <p className="font-semibold text-emerald-600">TZS {sale.sellingPrice?.toLocaleString('en-US')}</p>
                   <p className="text-xs text-gray-500">
                     {new Date(sale.saleDate).toLocaleDateString()}
                   </p>
@@ -533,8 +573,9 @@ const AdminDashboard = ({ stats, chartData }) => {
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       </div>
+
     </>
   );
 };
@@ -564,6 +605,7 @@ const StaffDashboard = ({ stats }) => {
         <h2 className="text-xl font-semibold mb-4">System Overview</h2>
         <p className="text-gray-600">Welcome to MR PIKIPIKI TRADING Management System</p>
       </Card>
+
     </>
   );
 };

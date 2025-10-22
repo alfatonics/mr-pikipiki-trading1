@@ -140,22 +140,31 @@ const Transport = () => {
   ];
 
   return (
-    <div className="animate-fade-in">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Transport & Delivery</h1>
-        <Button onClick={() => setModalOpen(true)}>
-          <FiPlus className="inline mr-2" />
-          Schedule Transport
-        </Button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Modern Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans tracking-tight">Transport & Delivery</h1>
+            <p className="text-gray-600">Schedule and manage motorcycle deliveries</p>
+          </div>
+          <Button onClick={() => setModalOpen(true)}>
+            <FiPlus className="inline mr-2" />
+            Schedule Transport
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <TableWithSearch 
-          columns={columns} 
-          data={transports}
-          searchKeys={['motorcycle.brand', 'motorcycle.model', 'customer.fullName', 'driver.fullName', 'pickupLocation', 'deliveryLocation']}
-        />
-      </Card>
+      {/* Main Content */}
+      <div className="p-4">
+        <Card>
+          <TableWithSearch 
+            columns={columns} 
+            data={transports}
+            searchKeys={['motorcycle.brand', 'motorcycle.model', 'customer.fullName', 'driver.fullName', 'pickupLocation', 'deliveryLocation']}
+          />
+        </Card>
+      </div>
 
       <Modal
         isOpen={modalOpen}

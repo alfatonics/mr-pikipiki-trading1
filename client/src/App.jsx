@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -14,6 +15,7 @@ import Users from './pages/Users';
 import Approvals from './pages/Approvals';
 import MyRequests from './pages/MyRequests';
 import MyJobs from './pages/MyJobs';
+import Notifications from './pages/Notifications';
 import Layout from './components/Layout';
 
 const PrivateRoute = ({ children }) => {
@@ -24,15 +26,16 @@ const PrivateRoute = ({ children }) => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          <Route path="/" element={
-            <PrivateRoute>
-              <Layout />
-            </PrivateRoute>
-          }>
+      <NotificationProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            <Route path="/" element={
+              <PrivateRoute>
+                <Layout />
+              </PrivateRoute>
+            }>
             <Route index element={<Dashboard />} />
             <Route path="motorcycles" element={<Motorcycles />} />
             <Route path="suppliers" element={<Suppliers />} />
@@ -45,9 +48,11 @@ function App() {
             <Route path="approvals" element={<Approvals />} />
             <Route path="my-requests" element={<MyRequests />} />
             <Route path="users" element={<Users />} />
-          </Route>
-        </Routes>
-      </Router>
+            <Route path="notifications" element={<Notifications />} />
+            </Route>
+          </Routes>
+        </Router>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

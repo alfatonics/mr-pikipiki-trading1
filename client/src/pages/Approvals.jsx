@@ -209,22 +209,28 @@ const Approvals = () => {
   ];
 
   return (
-    <div className="animate-fade-in">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Approval Requests</h1>
-          {user?.role === 'sales' && (
-            <p className="text-gray-600 mt-2">
-              Review requests → Approve/Reject → Track in "Awaiting Admin" until final approval
-            </p>
-          )}
-          {user?.role === 'admin' && (
-            <p className="text-gray-600 mt-2">
-              Final approval for requests already reviewed by Sales team
-            </p>
-          )}
+    <div className="min-h-screen bg-gray-50">
+      {/* Modern Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans tracking-tight">Approval Requests</h1>
+            {user?.role === 'sales' && (
+              <p className="text-gray-600">
+                Review requests → Approve/Reject → Track in "Awaiting Admin" until final approval
+              </p>
+            )}
+            {user?.role === 'admin' && (
+              <p className="text-gray-600">
+                Final approval for requests already reviewed by Sales team
+              </p>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Main Content */}
+      <div className="p-4">
 
       {/* Info Card for Sales */}
       {user?.role === 'sales' && (
@@ -461,6 +467,7 @@ const Approvals = () => {
           </div>
         )}
       </Modal>
+      </div>
     </div>
   );
 };

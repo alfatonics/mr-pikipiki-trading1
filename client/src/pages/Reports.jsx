@@ -92,10 +92,20 @@ const Reports = () => {
   ];
 
   return (
-    <div className="animate-fade-in">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Reports</h1>
+    <div className="min-h-screen bg-gray-50">
+      {/* Modern Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans tracking-tight">Reports</h1>
+            <p className="text-gray-600">Generate and download system reports</p>
+          </div>
+        </div>
+      </div>
 
-      <Card className="mb-6">
+      {/* Main Content */}
+      <div className="p-4">
+        <Card className="mb-6">
         <h2 className="text-xl font-semibold mb-4">Date Range</h2>
         <div className="grid grid-cols-2 gap-4 max-w-2xl">
           <Input
@@ -117,42 +127,45 @@ const Reports = () => {
         {reportTypes.map((report) => {
           const Icon = report.icon;
           return (
-            <Card key={report.type} className="hover:shadow-lg transition-shadow">
-              <div className="flex items-start space-x-4">
-                <div className={`${report.color} p-3 rounded-lg text-white`}>
+            <div key={report.type} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+              <div className="flex items-center justify-between mb-4">
+                <div className={`${report.color} p-4 rounded-2xl text-white shadow-lg`}>
                   <Icon size={24} />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    {report.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    {report.description}
-                  </p>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleDownloadReport(report.type, 'excel')}
-                      disabled={loading}
-                    >
-                      <FiDownload className="inline mr-1" size={14} />
-                      Excel
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDownloadReport(report.type, 'json')}
-                      disabled={loading}
-                    >
-                      <FiFileText className="inline mr-1" size={14} />
-                      View
-                    </Button>
-                  </div>
-                </div>
               </div>
-            </Card>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {report.title}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {report.description}
+                </p>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  size="sm"
+                  onClick={() => handleDownloadReport(report.type, 'excel')}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  <FiDownload className="inline mr-1" size={14} />
+                  Excel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDownloadReport(report.type, 'json')}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  <FiFileText className="inline mr-1" size={14} />
+                  View
+                </Button>
+              </div>
+            </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

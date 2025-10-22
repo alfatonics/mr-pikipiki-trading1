@@ -268,16 +268,24 @@ const Contracts = () => {
   ];
 
   return (
-    <div className="animate-fade-in">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Contracts</h1>
-        <Button onClick={() => setModalOpen(true)}>
-          <FiPlus className="inline mr-2" />
-          Create Contract
-        </Button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Modern Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans tracking-tight">Contracts</h1>
+            <p className="text-gray-600">Manage purchase and sales contracts</p>
+          </div>
+          <Button onClick={() => setModalOpen(true)}>
+            <FiPlus className="inline mr-2" />
+            Create Contract
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
+      {/* Main Content */}
+      <div className="p-4">
+        <div className="flex flex-wrap gap-2 mb-6">
         <Button 
           variant={filter === 'all' ? 'primary' : 'outline'} 
           size="sm"
@@ -441,6 +449,7 @@ const Contracts = () => {
           </div>
         </form>
       </Modal>
+      </div>
     </div>
   );
 };
