@@ -38,7 +38,7 @@ const Login = () => {
               <img 
                 src="/logo.png" 
                 alt="MR PIKIPIKI TRADING" 
-                className="mx-auto h-10 sm:h-20 md:h-24 w-auto"
+                className="mx-auto h-12 sm:h-20 md:h-24 w-auto"
                 onError={(e) => {
                   // If logo doesn't exist, hide image and show text instead
                   e.target.style.display = 'none';
@@ -61,8 +61,8 @@ const Login = () => {
 
           <form onSubmit={handleSubmit}>
             <div className="mb-0">
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                <FiUser className="inline mr-1 sm:mr-2 text-xs sm:text-base" />
+              <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-1">
+                <FiUser className="inline mr-1 sm:mr-2 text-sm sm:text-base" />
                 Username
               </label>
               <Input
@@ -76,8 +76,8 @@ const Login = () => {
             </div>
 
             <div className="mb-0">
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                <FiLock className="inline mr-1 sm:mr-2 text-xs sm:text-base" />
+              <label className="block text-sm sm:text-sm font-medium text-gray-700 mb-1">
+                <FiLock className="inline mr-1 sm:mr-2 text-sm sm:text-base" />
                 Password
               </label>
               <Input

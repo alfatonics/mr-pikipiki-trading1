@@ -177,11 +177,11 @@ const Motorcycles = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Motorcycles</h1>
-        <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
-          <FiPlus className="inline mr-1 sm:mr-2 w-4 h-4 sm:w-5 sm:h-5" />
-          <span className="text-sm sm:text-base">Add Motorcycle</span>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Motorcycles</h1>
+        <Button onClick={() => setModalOpen(true)}>
+          <FiPlus className="inline mr-2" />
+          Add Motorcycle
         </Button>
       </div>
 

@@ -269,40 +269,36 @@ const Contracts = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Contracts</h1>
-          <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
-            <FiPlus className="inline mr-1 sm:mr-2 w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="text-sm sm:text-base">Create Contract</span>
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          <Button 
-            variant={filter === 'all' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => setFilter('all')}
-            className="flex-1 min-w-0 sm:flex-none sm:min-w-auto"
-          >
-            <span className="text-xs sm:text-sm">All</span>
-          </Button>
-          <Button 
-            variant={filter === 'purchase' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => setFilter('purchase')}
-            className="flex-1 min-w-0 sm:flex-none sm:min-w-auto"
-          >
-            <span className="text-xs sm:text-sm">Purchase</span>
-          </Button>
-          <Button 
-            variant={filter === 'sale' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => setFilter('sale')}
-            className="flex-1 min-w-0 sm:flex-none sm:min-w-auto"
-          >
-            <span className="text-xs sm:text-sm">Sales</span>
-          </Button>
-        </div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Contracts</h1>
+        <Button onClick={() => setModalOpen(true)}>
+          <FiPlus className="inline mr-2" />
+          Create Contract
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        <Button 
+          variant={filter === 'all' ? 'primary' : 'outline'} 
+          size="sm"
+          onClick={() => setFilter('all')}
+        >
+          All
+        </Button>
+        <Button 
+          variant={filter === 'purchase' ? 'primary' : 'outline'} 
+          size="sm"
+          onClick={() => setFilter('purchase')}
+        >
+          Purchase
+        </Button>
+        <Button 
+          variant={filter === 'sale' ? 'primary' : 'outline'} 
+          size="sm"
+          onClick={() => setFilter('sale')}
+        >
+          Sales
+        </Button>
       </div>
 
       <Card>
