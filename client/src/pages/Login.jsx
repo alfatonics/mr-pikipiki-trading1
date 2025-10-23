@@ -268,44 +268,7 @@ const Login = () => {
             >
               {loading ? "Logging in..." : "Login"}
             </Button>
-<<<<<<< HEAD
             
-                    {/* Test Login Button for Debugging */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUsername('mechanic1');
-                        setPassword('password123');
-                        setDebugInfo('Test credentials filled. Click Login to test.');
-                      }}
-                      className="w-full mt-1 px-3 py-2 bg-green-100 text-green-700 text-xs rounded-lg hover:bg-green-200 transition-colors"
-                    >
-                      🧪 Fill Test Credentials
-                    </button>
-                    
-                    {/* Mobile Login Test Button */}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setUsername('mechanic1');
-                        setPassword('password123');
-                        setDebugInfo('Testing mobile login...');
-                        
-                        try {
-                          // Test login directly
-                          await login('mechanic1', 'password123');
-                          setDebugInfo('Mobile login test: SUCCESS!');
-                        } catch (error) {
-                          setDebugInfo(`Mobile login test: FAILED - ${error.message}`);
-                        }
-                      }}
-                      className="w-full mt-1 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded-lg hover:bg-blue-200 transition-colors"
-                    >
-                      📱 Test Mobile Login
-                    </button>
-            
-=======
-
             {/* Test Login Button for Debugging */}
             <button
               type="button"
@@ -318,8 +281,39 @@ const Login = () => {
             >
               🧪 Fill Test Credentials
             </button>
-
->>>>>>> 38bd14e6b2ffe163ff224431558735a3b9333957
+            
+            {/* Mobile Login Test Button */}
+            <button
+              type="button"
+              onClick={async () => {
+                setUsername("mechanic1");
+                setPassword("password123");
+                setDebugInfo("Testing mobile login...");
+                
+                try {
+                  // Test login directly
+                  await login("mechanic1", "password123");
+                  setDebugInfo("Mobile login test: SUCCESS!");
+                } catch (error) {
+                  setDebugInfo(`Mobile login test: FAILED - ${error.message}`);
+                }
+              }}
+              className="w-full mt-1 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded-lg hover:bg-blue-200 transition-colors"
+            >
+              📱 Test Mobile Login
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUsername("mechanic1");
+                setPassword("password123");
+                setDebugInfo("Test credentials filled. Click Login to test.");
+              }}
+              className="w-full mt-1 px-3 py-2 bg-green-100 text-green-700 text-xs rounded-lg hover:bg-green-200 transition-colors"
+            >
+              🧪 Fill Test Credentials
+            </button>
+            
             {/* Mobile Debug Button */}
             <button
               type="button"
