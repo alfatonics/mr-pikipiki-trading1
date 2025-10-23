@@ -20,8 +20,15 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: true, // Allow all origins
-  credentials: true
+  origin: [
+    'http://localhost:3000',
+    'https://mr-pikipiki-trading.vercel.app',
+    'https://mr-pikipiki-trading-git-main-alfatonics.vercel.app',
+    /\.vercel\.app$/
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
