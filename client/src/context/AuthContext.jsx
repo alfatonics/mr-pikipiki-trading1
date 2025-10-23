@@ -16,7 +16,6 @@ const isTokenValid = (token) => {
   }
 };
 
-
 const decodeToken = (token) => {
   try {
     return JSON.parse(atob(token.split('.')[1]));
@@ -28,8 +27,7 @@ const decodeToken = (token) => {
 // Global request tracking to prevent loops
 let isRequestInProgress = false;
 let lastRequestTime = 0;
-let isAuthInitialized = false;
-const MIN_REQUEST_INTERVAL = 500; // 500ms between requests (reduced from 2 seconds)
+const MIN_REQUEST_INTERVAL = 500;
 
 // Add request interceptor to ensure token is always included
 axios.interceptors.request.use(
@@ -76,14 +74,14 @@ axios.interceptors.request.use(
     isRequestInProgress = true;
     lastRequestTime = now;
     
-            const token = localStorage.getItem('token');
-            if (token && isTokenValid(token)) {
-              config.headers.Authorization = `Bearer ${token}`;
-            } else if (token && !isTokenValid(token)) {
-              // Token expired, remove it
-              localStorage.removeItem('token');
-              delete config.headers.Authorization;
-            }
+    const token = localStorage.getItem('token');
+    if (token && isTokenValid(token)) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else if (token && !isTokenValid(token)) {
+      // Token expired, remove it
+      localStorage.removeItem('token');
+      delete config.headers.Authorization;
+    }
     return config;
   },
   (error) => {
@@ -95,23 +93,18 @@ axios.interceptors.request.use(
 // Add response interceptor to handle token expiration
 axios.interceptors.response.use(
   (response) => {
-    // Reset request tracking on successful response
     isRequestInProgress = false;
     return response;
   },
   (error) => {
-    // Reset request tracking on error
     isRequestInProgress = false;
     
     if (error.response?.status === 401) {
-      // Token expired or invalid, clear it
+      console.log('Token expired or invalid, clearing auth data');
       localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
-      // Only redirect if not already on login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+      // Don't redirect here, let the component handle it
     }
+    
     return Promise.reject(error);
   }
 );
@@ -121,7 +114,7 @@ const AuthContext = createContext();
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
@@ -130,122 +123,86 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
 
   // Initialize authentication state
   const initializeAuth = useCallback(async () => {
-    // Prevent multiple simultaneous initializations
-    if (isInitializing || isAuthInitialized) {
-      console.log('Auth initialization already in progress or completed, skipping...');
-      return;
-    }
-
-
+    console.log('Initializing authentication...');
+    setIsLoading(true);
+    
     try {
-      isAuthInitialized = true;
-      setIsInitializing(true);
-      setIsLoading(true);
-      
-      // Add timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        console.log('Auth initialization timeout - setting fallback state');
-        setIsLoading(false);
-        setIsInitialized(true);
-        setIsInitializing(false);
-      }, 5000); // 5 second timeout
-      
       const token = localStorage.getItem('token');
       
       if (!token) {
-        console.log('No token found');
-        clearTimeout(timeoutId);
+        console.log('No token found - user not authenticated');
         setUser(null);
+        setIsLoading(false);
+        setIsInitialized(true);
         return;
       }
 
       if (!isTokenValid(token)) {
         console.log('Token expired or invalid, clearing');
-        clearTimeout(timeoutId);
         localStorage.removeItem('token');
         setUser(null);
+        setIsLoading(false);
+        setIsInitialized(true);
         return;
       }
 
       // Decode token to get user data
       const userData = decodeToken(token);
-      if (userData) {
+      if (userData && userData.username && userData.role) {
         console.log('User restored from token:', userData);
-        clearTimeout(timeoutId);
         setUser(userData);
-        
-        // Completely skip server verification to prevent loops
-        console.log('Skipping server verification completely to prevent loops');
       } else {
-        console.log('Failed to decode token');
-        clearTimeout(timeoutId);
+        console.log('Failed to decode token or invalid user data - user not authenticated');
         localStorage.removeItem('token');
         setUser(null);
       }
     } catch (error) {
       console.error('Auth initialization error:', error);
-      clearTimeout(timeoutId);
       localStorage.removeItem('token');
       setUser(null);
     } finally {
       setIsLoading(false);
       setIsInitialized(true);
-      setIsInitializing(false);
     }
-  }, [isInitializing]);
+  }, []);
 
+  // Initialize auth on mount
   useEffect(() => {
-    console.log('AuthContext useEffect triggered');
-    
-    
-    // Add a shorter delay to prevent loading issues
-    const timeoutId = setTimeout(() => {
-      console.log('Starting auth initialization...');
-      initializeAuth();
-    }, 1000); // Reduced to 1 second
-    
-    // Handle browser close/refresh
-    const handleBeforeUnload = () => {
-      console.log('Page unloading');
-    };
-    
-    // Handle page visibility changes
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log('Page hidden');
-      } else {
-        console.log('Page visible');
-      }
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []); // Remove dependencies to prevent re-initialization
+    initializeAuth();
+  }, [initializeAuth]);
 
   const login = async (username, password) => {
     try {
-      console.log('Attempting login for:', username);
+      console.log('=== LOGIN ATTEMPT START ===');
+      console.log('Username:', username);
       console.log('User Agent:', navigator.userAgent);
       console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      console.log('Base URL:', axios.defaults.baseURL);
+      console.log('Current URL:', window.location.href);
       setIsLoading(true);
       
       // Mobile browsers may need longer timeout
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const timeout = isMobile ? 30000 : 10000; // 30 seconds for mobile, 10 for desktop
       
+      console.log('Making login request with timeout:', timeout);
       const response = await axios.post('/api/auth/login', { username, password }, {
-        timeout: timeout
+        timeout: timeout,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
+      
+      console.log('Login response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data
+      });
+      
       const { token, user: userData } = response.data;
       
       if (!token) {
@@ -268,14 +225,15 @@ export const AuthProvider = ({ children }) => {
       console.log('Login process completed successfully');
       return userData;
     } catch (error) {
-      console.error('Login error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        userAgent: navigator.userAgent,
-        isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      });
+      console.error('=== LOGIN ERROR ===');
+      console.error('Error message:', error.message);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('User Agent:', navigator.userAgent);
+      console.error('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      console.error('Network status:', navigator.onLine);
+      console.error('Base URL:', axios.defaults.baseURL);
+      
       // Clear any existing token on login failure
       localStorage.removeItem('token');
       setUser(null);
@@ -324,12 +282,16 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
-    isLoading: isLoading || isInitializing,
-    isInitialized,
     login,
     logout,
-    refreshToken
+    refreshToken,
+    isLoading,
+    isInitialized
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
