@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "client/dist",
   "builds": [
     {
       "src": "client/package.json",
@@ -26,9 +28,9 @@
       "dest": "/client/dist/index.html"
     }
   ],
-  "env": {
-    "NODE_ENV": "production",
-    "MONGODB_URI": "mongodb+srv://mrpikipiki:bp2kOzatPLUW5RfG@mrpikipiki.zqt65e1.mongodb.net/mr-pikipiki-trading?retryWrites=true&w=majority&appName=mrpikipiki",
-    "JWT_SECRET": "mr-pikipiki-trading-secret-key-2024"
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30
+    }
   }
 }
