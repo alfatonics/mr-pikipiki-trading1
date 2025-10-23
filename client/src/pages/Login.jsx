@@ -141,8 +141,18 @@ const Login = () => {
           
           {debugInfo && !error && (
             <div className="bg-blue-50 border border-blue-200 text-blue-600 p-3 sm:p-4 rounded-lg mb-3 sm:mb-4 text-xs sm:text-sm">
-              <div className="font-semibold mb-1">Debug Info:</div>
-              <div>{debugInfo}</div>
+              <div className="font-semibold mb-2 flex items-center gap-2">
+                🔍 Debug Info:
+                <button
+                  onClick={() => setDebugInfo('')}
+                  className="text-blue-400 hover:text-blue-600 text-xs"
+                >
+                  ✕ Clear
+                </button>
+              </div>
+              <div className="whitespace-pre-line font-mono text-xs leading-relaxed">
+                {debugInfo}
+              </div>
             </div>
           )}
 
@@ -183,37 +193,93 @@ const Login = () => {
               {loading ? 'Logging in...' : 'Login'}
             </Button>
             
-            {/* Mobile Debug Button */}
+            {/* Test Login Button for Debugging */}
             <button
               type="button"
               onClick={() => {
-                console.log('=== MOBILE DEBUG INFO ===');
-                console.log('User Agent:', navigator.userAgent);
-                console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-                console.log('Network Status:', navigator.onLine);
-                console.log('Current URL:', window.location.href);
-                console.log('Environment:', process.env.NODE_ENV);
-                console.log('Screen Size:', window.screen.width + 'x' + window.screen.height);
-                console.log('Viewport Size:', window.innerWidth + 'x' + window.innerHeight);
+                setUsername('mechanic1');
+                setPassword('password123');
+                setDebugInfo('Test credentials filled. Click Login to test.');
+              }}
+              className="w-full mt-1 px-3 py-2 bg-green-100 text-green-700 text-xs rounded-lg hover:bg-green-200 transition-colors"
+            >
+              🧪 Fill Test Credentials
+            </button>
+            
+            {/* Mobile Debug Button */}
+            <button
+              type="button"
+              onClick={async () => {
+                const debugInfo = {
+                  userAgent: navigator.userAgent,
+                  isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+                  networkStatus: navigator.onLine,
+                  currentURL: window.location.href,
+                  environment: process.env.NODE_ENV,
+                  screenSize: window.screen.width + 'x' + window.screen.height,
+                  viewportSize: window.innerWidth + 'x' + window.innerHeight,
+                  timestamp: new Date().toLocaleString()
+                };
+                
+                console.log('=== MOBILE DEBUG INFO ===', debugInfo);
                 
                 // Test API connection
-                fetch('/api/auth/verify', {
-                  method: 'GET',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                  }
-                })
-                .then(response => {
-                  console.log('API Test Response:', response.status, response.statusText);
-                  return response.text();
-                })
-                .then(text => {
-                  console.log('API Test Response Body:', text);
-                })
-                .catch(error => {
+                try {
+                  const response = await fetch('/api/auth/verify', {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json'
+                    }
+                  });
+                  
+                  const apiResult = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    url: response.url
+                  };
+                  
+                  console.log('API Test Response:', apiResult);
+                  
+                  // Display debug info on the page
+                  const debugText = `
+MOBILE DEBUG INFO:
+• Device: ${debugInfo.isMobile ? 'Mobile' : 'Desktop'}
+• Browser: ${debugInfo.userAgent.split(' ')[0]}
+• Network: ${debugInfo.networkStatus ? 'Online' : 'Offline'}
+• URL: ${debugInfo.currentURL}
+• Screen: ${debugInfo.screenSize}
+• Viewport: ${debugInfo.viewportSize}
+• Environment: ${debugInfo.environment}
+• Time: ${debugInfo.timestamp}
+
+API TEST:
+• Status: ${apiResult.status} ${apiResult.statusText}
+• Success: ${apiResult.ok ? 'YES' : 'NO'}
+• URL: ${apiResult.url}
+                  `;
+                  
+                  setDebugInfo(debugText);
+                  
+                } catch (error) {
                   console.error('API Test Error:', error);
-                });
+                  setDebugInfo(`
+MOBILE DEBUG INFO:
+• Device: ${debugInfo.isMobile ? 'Mobile' : 'Desktop'}
+• Browser: ${debugInfo.userAgent.split(' ')[0]}
+• Network: ${debugInfo.networkStatus ? 'Online' : 'Offline'}
+• URL: ${debugInfo.currentURL}
+• Screen: ${debugInfo.screenSize}
+• Viewport: ${debugInfo.viewportSize}
+• Environment: ${debugInfo.environment}
+• Time: ${debugInfo.timestamp}
+
+API TEST:
+• ERROR: ${error.message}
+• Connection: FAILED
+                  `);
+                }
               }}
               className="w-full mt-2 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded-lg hover:bg-blue-200 transition-colors"
             >

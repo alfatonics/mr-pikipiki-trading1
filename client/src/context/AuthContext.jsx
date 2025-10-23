@@ -42,23 +42,27 @@ let isRequestInProgress = false;
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 500;
 
-// Add request interceptor to ensure token is always included
+// Enhanced request interceptor for mobile compatibility
 axios.interceptors.request.use(
   (config) => {
+    console.log('=== REQUEST INTERCEPTOR ===');
+    console.log('URL:', config.url);
+    console.log('Method:', config.method);
+    console.log('Headers:', config.headers);
+    
     // Skip rate limiting for login requests
     if (config.url?.includes('/auth/login')) {
-      const token = localStorage.getItem('token');
-      if (token && isTokenValid(token)) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+      console.log('Login request - skipping token check');
       return config;
     }
     
     // Skip rate limiting for dashboard requests
     if (config.url?.includes('/dashboard/')) {
       const token = localStorage.getItem('token');
+      console.log('Dashboard request - token check:', token ? 'Present' : 'Missing');
       if (token && isTokenValid(token)) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('Dashboard request - token added');
       }
       return config;
     }
@@ -87,18 +91,38 @@ axios.interceptors.request.use(
     isRequestInProgress = true;
     lastRequestTime = now;
     
-    const token = localStorage.getItem('token');
+    // Enhanced token handling for mobile - check both localStorage and sessionStorage
+    let token = localStorage.getItem('token');
+    let tokenSource = 'localStorage';
+    
+    // If no token in localStorage, check sessionStorage (mobile backup)
+    if (!token) {
+      token = sessionStorage.getItem('token');
+      tokenSource = 'sessionStorage';
+    }
+    
+    console.log('Token check:', token ? 'Present' : 'Missing');
+    console.log('Token source:', tokenSource);
+    console.log('Token valid:', token ? isTokenValid(token) : 'N/A');
+    
     if (token && isTokenValid(token)) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('Token added to request from', tokenSource);
     } else if (token && !isTokenValid(token)) {
-      // Token expired, remove it
+      console.log('Token expired, removing from both storages');
       localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       delete config.headers.Authorization;
+    } else {
+      console.log('No valid token available in either storage');
     }
+    
+    console.log('Final headers:', config.headers);
     return config;
   },
   (error) => {
     isRequestInProgress = false;
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -247,7 +271,26 @@ export const AuthProvider = ({ children }) => {
       }
 
       console.log('Login successful, storing token');
-      localStorage.setItem('token', token);
+      
+      // Enhanced token storage for mobile compatibility
+      try {
+        localStorage.setItem('token', token);
+        console.log('Token stored in localStorage');
+        
+        // Also store in sessionStorage as backup for mobile
+        if (isMobile) {
+          sessionStorage.setItem('token', token);
+          console.log('Token also stored in sessionStorage for mobile');
+        }
+        
+        // Test token retrieval immediately
+        const storedToken = localStorage.getItem('token');
+        console.log('Token retrieval test:', storedToken ? 'Success' : 'Failed');
+        
+      } catch (storageError) {
+        console.error('Token storage error:', storageError);
+        throw new Error('Failed to store authentication token');
+      }
       
       // Decode token to get user data
       const decodedUser = decodeToken(token);
@@ -320,6 +363,7 @@ export const AuthProvider = ({ children }) => {
       
       // Clear any existing token on login failure
       localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       setUser(null);
       
       // Create enhanced error with mobile-specific message
