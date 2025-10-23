@@ -16,6 +16,28 @@ const isTokenValid = (token) => {
   }
 };
 
+// Mobile-compatible token retrieval
+const getStoredToken = () => {
+  try {
+    // Try localStorage first
+    const localToken = localStorage.getItem('token');
+    if (localToken && isTokenValid(localToken)) {
+      return localToken;
+    }
+    
+    // Fallback to sessionStorage for mobile browsers
+    const sessionToken = sessionStorage.getItem('token');
+    if (sessionToken && isTokenValid(sessionToken)) {
+      return sessionToken;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error accessing storage:', error);
+    return null;
+  }
+};
+
 const decodeToken = (token) => {
   try {
     return JSON.parse(atob(token.split('.')[1]));
@@ -35,8 +57,8 @@ axios.interceptors.request.use(
   (config) => {
     // Skip rate limiting for login requests
     if (config.url?.includes('/auth/login')) {
-      const token = localStorage.getItem('token');
-      if (token && isTokenValid(token)) {
+      const token = getStoredToken();
+      if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
@@ -44,8 +66,8 @@ axios.interceptors.request.use(
     
     // Skip rate limiting for dashboard requests
     if (config.url?.includes('/dashboard/')) {
-      const token = localStorage.getItem('token');
-      if (token && isTokenValid(token)) {
+      const token = getStoredToken();
+      if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
@@ -75,14 +97,19 @@ axios.interceptors.request.use(
     isRequestInProgress = true;
     lastRequestTime = now;
     
-    const token = localStorage.getItem('token');
-    if (token && isTokenValid(token)) {
-      config.headers.Authorization = `Bearer ${token}`;
-    } else if (token && !isTokenValid(token)) {
-      // Token expired, remove it
-      localStorage.removeItem('token');
-      delete config.headers.Authorization;
-    }
+            const token = getStoredToken();
+            if (token) {
+              config.headers.Authorization = `Bearer ${token}`;
+            } else {
+              // No valid token found, clear any expired tokens
+              try {
+                localStorage.removeItem('token');
+                sessionStorage.removeItem('token');
+              } catch (error) {
+                console.warn('Error clearing expired tokens:', error);
+              }
+              delete config.headers.Authorization;
+            }
     return config;
   },
   (error) => {
@@ -270,9 +297,17 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       console.log('Attempting login for:', username);
+      console.log('User Agent:', navigator.userAgent);
+      console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
       setIsLoading(true);
       
-      const response = await axios.post('/api/auth/login', { username, password });
+      // Mobile browsers may need longer timeout
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const timeout = isMobile ? 30000 : 10000; // 30 seconds for mobile, 10 for desktop
+      
+      const response = await axios.post('/api/auth/login', { username, password }, {
+        timeout: timeout
+      });
       const { token, user: userData } = response.data;
       
       if (!token) {
@@ -280,8 +315,18 @@ export const AuthProvider = ({ children }) => {
       }
 
       console.log('Login successful, storing token and session flag');
-      localStorage.setItem('token', token);
-      sessionStorage.setItem('userSession', 'active');
+      
+      // Mobile-compatible storage with fallback
+      try {
+        localStorage.setItem('token', token);
+        sessionStorage.setItem('userSession', 'active');
+        console.log('Token stored successfully in localStorage and sessionStorage');
+      } catch (storageError) {
+        console.warn('localStorage failed, using sessionStorage only:', storageError);
+        // Fallback to sessionStorage only for mobile browsers
+        sessionStorage.setItem('token', token);
+        sessionStorage.setItem('userSession', 'active');
+      }
       
       // Decode token to get user data
       const decodedUser = decodeToken(token);
@@ -297,9 +342,21 @@ export const AuthProvider = ({ children }) => {
       return userData;
     } catch (error) {
       console.error('Login error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        userAgent: navigator.userAgent,
+        isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      });
       // Clear any existing token on login failure
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('userSession');
+      try {
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('userSession');
+      } catch (storageError) {
+        console.warn('Error clearing storage:', storageError);
+      }
       setUser(null);
       throw error;
     } finally {
@@ -309,8 +366,13 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(() => {
     console.log('Logging out user - clearing all authentication data');
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('userSession');
+    try {
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('userSession');
+    } catch (error) {
+      console.warn('Error clearing storage during logout:', error);
+    }
     setUser(null);
     // Clear any cached data
     delete axios.defaults.headers.common['Authorization'];
@@ -321,7 +383,7 @@ export const AuthProvider = ({ children }) => {
 
   const refreshToken = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       const sessionFlag = sessionStorage.getItem('userSession');
       
       if (!token || !isTokenValid(token) || !sessionFlag) {
