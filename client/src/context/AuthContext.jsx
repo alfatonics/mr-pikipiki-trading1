@@ -16,27 +16,6 @@ const isTokenValid = (token) => {
   }
 };
 
-// Mobile-compatible token retrieval
-const getStoredToken = () => {
-  try {
-    // Try localStorage first
-    const localToken = localStorage.getItem('token');
-    if (localToken && isTokenValid(localToken)) {
-      return localToken;
-    }
-    
-    // Fallback to sessionStorage for mobile browsers
-    const sessionToken = sessionStorage.getItem('token');
-    if (sessionToken && isTokenValid(sessionToken)) {
-      return sessionToken;
-    }
-    
-    return null;
-  } catch (error) {
-    console.warn('Error accessing storage:', error);
-    return null;
-  }
-};
 
 const decodeToken = (token) => {
   try {
@@ -57,8 +36,8 @@ axios.interceptors.request.use(
   (config) => {
     // Skip rate limiting for login requests
     if (config.url?.includes('/auth/login')) {
-      const token = getStoredToken();
-      if (token) {
+      const token = localStorage.getItem('token');
+      if (token && isTokenValid(token)) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
@@ -66,8 +45,8 @@ axios.interceptors.request.use(
     
     // Skip rate limiting for dashboard requests
     if (config.url?.includes('/dashboard/')) {
-      const token = getStoredToken();
-      if (token) {
+      const token = localStorage.getItem('token');
+      if (token && isTokenValid(token)) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
@@ -97,17 +76,12 @@ axios.interceptors.request.use(
     isRequestInProgress = true;
     lastRequestTime = now;
     
-            const token = getStoredToken();
-            if (token) {
+            const token = localStorage.getItem('token');
+            if (token && isTokenValid(token)) {
               config.headers.Authorization = `Bearer ${token}`;
-            } else {
-              // No valid token found, clear any expired tokens
-              try {
-                localStorage.removeItem('token');
-                sessionStorage.removeItem('token');
-              } catch (error) {
-                console.warn('Error clearing expired tokens:', error);
-              }
+            } else if (token && !isTokenValid(token)) {
+              // Token expired, remove it
+              localStorage.removeItem('token');
               delete config.headers.Authorization;
             }
     return config;
@@ -166,17 +140,6 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    // Security check: Ensure session flag exists
-    const sessionFlag = sessionStorage.getItem('userSession');
-    if (!sessionFlag) {
-      console.log('Security check failed - no session flag, clearing auth data');
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('userSession');
-      setUser(null);
-      setIsLoading(false);
-      setIsInitialized(true);
-      return;
-    }
 
     try {
       isAuthInitialized = true;
@@ -204,7 +167,6 @@ export const AuthProvider = ({ children }) => {
         console.log('Token expired or invalid, clearing');
         clearTimeout(timeoutId);
         localStorage.removeItem('token');
-        sessionStorage.removeItem('userSession');
         setUser(null);
         return;
       }
@@ -216,23 +178,18 @@ export const AuthProvider = ({ children }) => {
         clearTimeout(timeoutId);
         setUser(userData);
         
-        // Set session flag if user is valid
-        sessionStorage.setItem('userSession', 'active');
-        
         // Completely skip server verification to prevent loops
         console.log('Skipping server verification completely to prevent loops');
       } else {
         console.log('Failed to decode token');
         clearTimeout(timeoutId);
         localStorage.removeItem('token');
-        sessionStorage.removeItem('userSession');
         setUser(null);
       }
     } catch (error) {
       console.error('Auth initialization error:', error);
       clearTimeout(timeoutId);
       localStorage.removeItem('token');
-      sessionStorage.removeItem('userSession');
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -244,17 +201,6 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log('AuthContext useEffect triggered');
     
-    // Check if this is a fresh browser session
-    const sessionFlag = sessionStorage.getItem('userSession');
-    if (!sessionFlag) {
-      console.log('No session flag found - this is a fresh browser session, clearing all auth data');
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('userSession');
-      setUser(null);
-      setIsLoading(false);
-      setIsInitialized(true);
-      return;
-    }
     
     // Add a shorter delay to prevent loading issues
     const timeoutId = setTimeout(() => {
@@ -264,23 +210,15 @@ export const AuthProvider = ({ children }) => {
     
     // Handle browser close/refresh
     const handleBeforeUnload = () => {
-      console.log('Page unloading - clearing session flag');
-      sessionStorage.removeItem('userSession');
+      console.log('Page unloading');
     };
     
-    // Handle page visibility changes for security
+    // Handle page visibility changes
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        console.log('Page hidden - maintaining session');
+        console.log('Page hidden');
       } else {
-        // Page is visible again - check if session is still valid
-        const currentSessionFlag = sessionStorage.getItem('userSession');
-        if (!currentSessionFlag) {
-          console.log('Session flag missing on page visibility - logging out for security');
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('userSession');
-          setUser(null);
-        }
+        console.log('Page visible');
       }
     };
     
@@ -314,19 +252,8 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No token received from server');
       }
 
-      console.log('Login successful, storing token and session flag');
-      
-      // Mobile-compatible storage with fallback
-      try {
-        localStorage.setItem('token', token);
-        sessionStorage.setItem('userSession', 'active');
-        console.log('Token stored successfully in localStorage and sessionStorage');
-      } catch (storageError) {
-        console.warn('localStorage failed, using sessionStorage only:', storageError);
-        // Fallback to sessionStorage only for mobile browsers
-        sessionStorage.setItem('token', token);
-        sessionStorage.setItem('userSession', 'active');
-      }
+      console.log('Login successful, storing token');
+      localStorage.setItem('token', token);
       
       // Decode token to get user data
       const decodedUser = decodeToken(token);
@@ -350,13 +277,7 @@ export const AuthProvider = ({ children }) => {
         isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
       });
       // Clear any existing token on login failure
-      try {
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('userSession');
-      } catch (storageError) {
-        console.warn('Error clearing storage:', storageError);
-      }
+      localStorage.removeItem('token');
       setUser(null);
       throw error;
     } finally {
@@ -365,14 +286,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = useCallback(() => {
-    console.log('Logging out user - clearing all authentication data');
-    try {
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('userSession');
-    } catch (error) {
-      console.warn('Error clearing storage during logout:', error);
-    }
+    console.log('Logging out user');
+    localStorage.removeItem('token');
     setUser(null);
     // Clear any cached data
     delete axios.defaults.headers.common['Authorization'];
@@ -383,11 +298,10 @@ export const AuthProvider = ({ children }) => {
 
   const refreshToken = async () => {
     try {
-      const token = getStoredToken();
-      const sessionFlag = sessionStorage.getItem('userSession');
+      const token = localStorage.getItem('token');
       
-      if (!token || !isTokenValid(token) || !sessionFlag) {
-        throw new Error('No valid token or session to refresh');
+      if (!token || !isTokenValid(token)) {
+        throw new Error('No valid token to refresh');
       }
 
       const response = await axios.post('/api/auth/refresh');
@@ -395,7 +309,6 @@ export const AuthProvider = ({ children }) => {
       
       if (newToken) {
         localStorage.setItem('token', newToken);
-        sessionStorage.setItem('userSession', 'active');
         const userData = decodeToken(newToken);
         if (userData) {
           setUser(userData);
