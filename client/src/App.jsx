@@ -27,6 +27,12 @@ import Layout from "./components/Layout";
 const PrivateRoute = ({ children }) => {
   const { user, isLoading, isInitialized } = useAuth();
 
+  console.log("PrivateRoute check:", {
+    user: !!user,
+    isLoading,
+    isInitialized,
+  });
+
   // Show loading while authentication is being checked
   if (!isInitialized || isLoading) {
     return (
@@ -41,9 +47,23 @@ const PrivateRoute = ({ children }) => {
 
   // Redirect to login if not authenticated
   if (!user) {
+    console.log("PrivateRoute: No user, redirecting to login");
+
+    // Force redirect on mobile to ensure proper navigation
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+    if (isMobile) {
+      console.log("Mobile detected - forcing redirect to login");
+      window.location.href = "/login";
+      return null;
+    }
+
     return <Navigate to="/login" replace />;
   }
 
+  console.log("PrivateRoute: User authenticated, showing content");
   return children;
 };
 
@@ -68,6 +88,18 @@ const PublicRoute = ({ children }) => {
   // Redirect to dashboard if already authenticated
   if (user) {
     console.log("PublicRoute: User authenticated, redirecting to dashboard");
+
+    // Force redirect on mobile to ensure proper navigation
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+    if (isMobile) {
+      console.log("Mobile detected - forcing redirect");
+      window.location.href = "/";
+      return null;
+    }
+
     return <Navigate to="/" replace />;
   }
 

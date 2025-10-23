@@ -14,38 +14,7 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const testAPIConnection = async () => {
-    try {
-      console.log("Testing API connection...");
-      const response = await fetch("/api/auth/verify", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      });
-
-      const result = {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        url: response.url,
-        headers: Object.fromEntries(response.headers.entries()),
-      };
-
-      console.log("API Test Result:", result);
-      setDebugInfo(
-        `API Test: ${response.status} ${response.statusText} - ${
-          response.ok ? "SUCCESS" : "FAILED"
-        }`
-      );
-      return result;
-    } catch (error) {
-      console.error("API Test Error:", error);
-      setDebugInfo(`API Test: FAILED - ${error.message}`);
-      return { error: error.message };
-    }
-  };
+  // API connection test removed - it was causing 401 errors before login
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,22 +25,25 @@ const Login = () => {
     try {
       console.log("Login form submitted");
 
-      // Test API connection first
-      const apiTest = await testAPIConnection();
-      if (apiTest.error) {
-        setError(`API Connection Failed: ${apiTest.error}`);
-        setLoading(false);
-        return;
-      }
-
       const userData = await login(username, password);
       console.log("Login successful, user data received:", userData);
 
       // Add a small delay to ensure state updates on mobile
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       console.log("Navigating to dashboard");
-      navigate("/", { replace: true });
+
+      // Force page reload on mobile to ensure state updates
+      const isMobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
+      if (isMobile) {
+        console.log("Mobile detected - forcing page reload");
+        window.location.href = "/";
+      } else {
+        navigate("/", { replace: true });
+      }
     } catch (err) {
       console.error("Login form error:", err);
       console.error("Error details:", {
@@ -265,27 +237,8 @@ const Login = () => {
 
                 console.log("=== MOBILE DEBUG INFO ===", debugInfo);
 
-                // Test API connection
-                try {
-                  const response = await fetch("/api/auth/verify", {
-                    method: "GET",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Accept: "application/json",
-                    },
-                  });
-
-                  const apiResult = {
-                    status: response.status,
-                    statusText: response.statusText,
-                    ok: response.ok,
-                    url: response.url,
-                  };
-
-                  console.log("API Test Response:", apiResult);
-
-                  // Display debug info on the page
-                  const debugText = `
+                // Display debug info on the page
+                const debugText = `
 MOBILE DEBUG INFO:
 • Device: ${debugInfo.isMobile ? "Mobile" : "Desktop"}
 • Browser: ${debugInfo.userAgent.split(" ")[0]}
@@ -296,31 +249,10 @@ MOBILE DEBUG INFO:
 • Environment: ${debugInfo.environment}
 • Time: ${debugInfo.timestamp}
 
-API TEST:
-• Status: ${apiResult.status} ${apiResult.statusText}
-• Success: ${apiResult.ok ? "YES" : "NO"}
-• URL: ${apiResult.url}
-                  `;
+NOTE: API test removed to prevent 401 errors before login
+                `;
 
-                  setDebugInfo(debugText);
-                } catch (error) {
-                  console.error("API Test Error:", error);
-                  setDebugInfo(`
-MOBILE DEBUG INFO:
-• Device: ${debugInfo.isMobile ? "Mobile" : "Desktop"}
-• Browser: ${debugInfo.userAgent.split(" ")[0]}
-• Network: ${debugInfo.networkStatus ? "Online" : "Offline"}
-• URL: ${debugInfo.currentURL}
-• Screen: ${debugInfo.screenSize}
-• Viewport: ${debugInfo.viewportSize}
-• Environment: ${debugInfo.environment}
-• Time: ${debugInfo.timestamp}
-
-API TEST:
-• ERROR: ${error.message}
-• Connection: FAILED
-                  `);
-                }
+                setDebugInfo(debugText);
               }}
               className="w-full mt-2 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded-lg hover:bg-blue-200 transition-colors"
             >

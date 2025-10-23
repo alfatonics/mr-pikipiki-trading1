@@ -179,7 +179,16 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
+      // Check both localStorage and sessionStorage for mobile compatibility
+      let token = localStorage.getItem("token");
+      let tokenSource = "localStorage";
+
+      if (!token) {
+        token = sessionStorage.getItem("token");
+        tokenSource = "sessionStorage";
+      }
+
+      console.log("Token source:", tokenSource);
 
       if (!token) {
         console.log("No token found - user not authenticated");
@@ -192,6 +201,7 @@ export const AuthProvider = ({ children }) => {
       if (!isTokenValid(token)) {
         console.log("Token expired or invalid, clearing");
         localStorage.removeItem("token");
+        sessionStorage.removeItem("token");
         setUser(null);
         setIsLoading(false);
         setIsInitialized(true);
@@ -203,16 +213,25 @@ export const AuthProvider = ({ children }) => {
       if (userData && userData.username && userData.role) {
         console.log("User restored from token:", userData);
         setUser(userData);
+
+        // Ensure token is in both storages for mobile
+        if (tokenSource === "localStorage") {
+          sessionStorage.setItem("token", token);
+        } else {
+          localStorage.setItem("token", token);
+        }
       } else {
         console.log(
           "Failed to decode token or invalid user data - user not authenticated"
         );
         localStorage.removeItem("token");
+        sessionStorage.removeItem("token");
         setUser(null);
       }
     } catch (error) {
       console.error("Auth initialization error:", error);
       localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -415,6 +434,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("token");
       sessionStorage.removeItem("token");
       setUser(null);
+      setIsLoading(false);
+      setIsInitialized(true);
 
       // Create enhanced error with mobile-specific message
       const enhancedError = new Error(errorMessage);
@@ -433,7 +454,10 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(() => {
     console.log("Logging out user");
     localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     setUser(null);
+    setIsLoading(false);
+    setIsInitialized(false);
     // Clear any cached data
     delete axios.defaults.headers.common["Authorization"];
 
