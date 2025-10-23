@@ -62,6 +62,14 @@ const Layout = () => {
 
   // If no user after initialization, redirect to login
   if (!user) {
+    console.log('No user found, redirecting to login');
+    navigate('/login');
+    return null;
+  }
+
+  // Additional security check - ensure user has required properties
+  if (!user.username || !user.role) {
+    console.log('Invalid user data, redirecting to login');
     navigate('/login');
     return null;
   }
