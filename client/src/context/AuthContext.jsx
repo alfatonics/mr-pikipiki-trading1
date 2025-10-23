@@ -275,20 +275,48 @@ export const AuthProvider = ({ children }) => {
       console.error('Current URL:', window.location.href);
       console.error('Environment:', process.env.NODE_ENV);
       
-      // Enhanced error handling for mobile
+      // Enhanced error handling for mobile with detailed debugging
       let errorMessage = 'Login failed. Please try again.';
+      let debugInfo = '';
       
       if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
         errorMessage = 'Network error. Please check your internet connection and try again.';
+        debugInfo = `Network Error - Code: ${error.code}, Message: ${error.message}`;
       } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         errorMessage = 'Request timed out. Please try again with a better connection.';
+        debugInfo = `Timeout Error - Code: ${error.code}, Message: ${error.message}`;
       } else if (error.response?.status === 401) {
         errorMessage = 'Invalid username or password. Please check your credentials.';
+        debugInfo = `Auth Error - Status: ${error.response.status}, Data: ${JSON.stringify(error.response.data)}`;
       } else if (error.response?.status === 500) {
         errorMessage = 'Server error. Please try again later.';
+        debugInfo = `Server Error - Status: ${error.response.status}, Data: ${JSON.stringify(error.response.data)}`;
       } else if (error.response?.status === 0) {
         errorMessage = 'Connection failed. Please check your internet connection.';
+        debugInfo = `Connection Error - Status: ${error.response?.status}, Message: ${error.message}`;
+      } else if (error.message?.includes('Request already in progress')) {
+        errorMessage = 'Request in progress. Please wait and try again.';
+        debugInfo = `Request Conflict - Message: ${error.message}`;
+      } else {
+        errorMessage = `Login failed: ${error.message || 'Unknown error'}`;
+        debugInfo = `Unknown Error - Code: ${error.code}, Status: ${error.response?.status}, Message: ${error.message}`;
       }
+      
+      // Add mobile-specific debug info
+      const mobileDebugInfo = `
+        Mobile Debug:
+        - User Agent: ${navigator.userAgent}
+        - Is Mobile: ${/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)}
+        - Network: ${navigator.onLine ? 'Online' : 'Offline'}
+        - URL: ${window.location.href}
+        - Environment: ${process.env.NODE_ENV}
+        - Base URL: ${axios.defaults.baseURL}
+        - Timeout: ${axios.defaults.timeout}
+        - Error Details: ${debugInfo}
+      `;
+      
+      console.error('=== ENHANCED MOBILE ERROR ===');
+      console.error(mobileDebugInfo);
       
       // Clear any existing token on login failure
       localStorage.removeItem('token');

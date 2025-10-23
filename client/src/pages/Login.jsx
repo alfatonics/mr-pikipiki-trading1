@@ -10,16 +10,56 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  const testAPIConnection = async () => {
+    try {
+      console.log('Testing API connection...');
+      const response = await fetch('/api/auth/verify', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      const result = {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        url: response.url,
+        headers: Object.fromEntries(response.headers.entries())
+      };
+      
+      console.log('API Test Result:', result);
+      setDebugInfo(`API Test: ${response.status} ${response.statusText} - ${response.ok ? 'SUCCESS' : 'FAILED'}`);
+      return result;
+    } catch (error) {
+      console.error('API Test Error:', error);
+      setDebugInfo(`API Test: FAILED - ${error.message}`);
+      return { error: error.message };
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setDebugInfo('');
     setLoading(true);
 
     try {
       console.log('Login form submitted');
+      
+      // Test API connection first
+      const apiTest = await testAPIConnection();
+      if (apiTest.error) {
+        setError(`API Connection Failed: ${apiTest.error}`);
+        setLoading(false);
+        return;
+      }
+      
       await login(username, password);
       console.log('Login successful, navigating to dashboard');
       navigate('/');
@@ -84,8 +124,25 @@ const Login = () => {
           </div>
 
           {error && (
-            <div className="bg-red-50 text-red-600 p-2 sm:p-3 rounded-lg mb-3 sm:mb-4 text-xs sm:text-sm">
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-600 p-3 sm:p-4 rounded-lg mb-3 sm:mb-4 text-xs sm:text-sm">
+              <div className="font-semibold mb-1">Login Error:</div>
+              <div className="mb-2">{error}</div>
+              <div className="text-xs text-red-500 bg-red-100 p-2 rounded">
+                <div><strong>Debug Info:</strong></div>
+                <div>User Agent: {navigator.userAgent}</div>
+                <div>Is Mobile: {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Yes' : 'No'}</div>
+                <div>Network: {navigator.onLine ? 'Online' : 'Offline'}</div>
+                <div>URL: {window.location.href}</div>
+                <div>Environment: {process.env.NODE_ENV}</div>
+                {debugInfo && <div className="mt-2 font-semibold">API Test: {debugInfo}</div>}
+              </div>
+            </div>
+          )}
+          
+          {debugInfo && !error && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-600 p-3 sm:p-4 rounded-lg mb-3 sm:mb-4 text-xs sm:text-sm">
+              <div className="font-semibold mb-1">Debug Info:</div>
+              <div>{debugInfo}</div>
             </div>
           )}
 
@@ -125,6 +182,43 @@ const Login = () => {
             >
               {loading ? 'Logging in...' : 'Login'}
             </Button>
+            
+            {/* Mobile Debug Button */}
+            <button
+              type="button"
+              onClick={() => {
+                console.log('=== MOBILE DEBUG INFO ===');
+                console.log('User Agent:', navigator.userAgent);
+                console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+                console.log('Network Status:', navigator.onLine);
+                console.log('Current URL:', window.location.href);
+                console.log('Environment:', process.env.NODE_ENV);
+                console.log('Screen Size:', window.screen.width + 'x' + window.screen.height);
+                console.log('Viewport Size:', window.innerWidth + 'x' + window.innerHeight);
+                
+                // Test API connection
+                fetch('/api/auth/verify', {
+                  method: 'GET',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  }
+                })
+                .then(response => {
+                  console.log('API Test Response:', response.status, response.statusText);
+                  return response.text();
+                })
+                .then(text => {
+                  console.log('API Test Response Body:', text);
+                })
+                .catch(error => {
+                  console.error('API Test Error:', error);
+                });
+              }}
+              className="w-full mt-2 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded-lg hover:bg-blue-200 transition-colors"
+            >
+              🔍 Mobile Debug Info
+            </button>
           </form>
 
           <div className="mt-2 sm:mt-6 text-center text-xs sm:text-sm text-gray-600">
