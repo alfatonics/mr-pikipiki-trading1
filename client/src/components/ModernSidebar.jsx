@@ -6,15 +6,15 @@ import {
 } from 'react-icons/fi';
 import { useState } from 'react';
 
-const ModernSidebar = ({ user, menuItems, isCollapsed, onToggleCollapse }) => {
+const ModernSidebar = ({ user, menuItems, isCollapsed, onToggleCollapse, isMobile = false }) => {
   const location = useLocation();
 
   return (
     <div className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 relative ${
-      isCollapsed ? 'w-16' : 'w-64'
-    }`}>
+      isMobile ? 'w-full' : isCollapsed ? 'w-16' : 'w-64'
+    } ${isMobile ? 'flex' : 'hidden lg:flex'}`} style={{borderRightWidth: '1px'}}>
       {/* Logo Section */}
-      <div className="px-6 py-4 border-b border-gray-200 relative z-10 h-16 flex items-center">
+      <div className={`px-4 sm:px-6 py-4 border-b border-gray-200 relative z-10 h-16 flex items-center ${isMobile ? 'justify-between' : ''}`} style={{borderBottomWidth: '1px', borderBottomColor: '#e5e7eb'}}>
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
             <img 
@@ -30,17 +30,25 @@ const ModernSidebar = ({ user, menuItems, isCollapsed, onToggleCollapse }) => {
               <span className="text-white font-bold text-lg">MP</span>
             </div>
           </div>
-          {!isCollapsed && (
+          {(!isCollapsed || isMobile) && (
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-gray-900 truncate">MR PIKIPIKI</h1>
               <p className="text-xs text-gray-500 truncate">Trading Management</p>
             </div>
           )}
         </div>
+        {isMobile && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <FiX className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className={`flex-1 p-3 sm:p-4 space-y-2 ${isMobile ? 'overflow-y-auto' : ''}`}>
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -49,6 +57,7 @@ const ModernSidebar = ({ user, menuItems, isCollapsed, onToggleCollapse }) => {
             <Link
               key={item.path}
               to={item.path}
+              onClick={isMobile ? onToggleCollapse : undefined}
               className={`group flex items-center space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                 isActive
                   ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
@@ -59,7 +68,7 @@ const ModernSidebar = ({ user, menuItems, isCollapsed, onToggleCollapse }) => {
               <Icon className={`w-5 h-5 flex-shrink-0 ${
                 isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'
               }`} />
-              {!isCollapsed && (
+              {(!isCollapsed || isMobile) && (
                 <span className="font-medium text-sm truncate">{item.label}</span>
               )}
             </Link>
@@ -68,16 +77,16 @@ const ModernSidebar = ({ user, menuItems, isCollapsed, onToggleCollapse }) => {
       </nav>
 
       {/* User Section */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-3 sm:p-4 border-t border-gray-200">
         <div className={`flex items-center space-x-3 ${
-          isCollapsed ? 'justify-center' : ''
+          (isCollapsed && !isMobile) ? 'justify-center' : ''
         }`}>
           <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
             <span className="text-white text-sm font-medium">
               {user?.fullName?.charAt(0) || 'U'}
             </span>
           </div>
-          {!isCollapsed && (
+          {(!isCollapsed || isMobile) && (
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-gray-900 truncate">{user?.fullName}</p>
               <p className="text-xs text-gray-500 capitalize truncate">{user?.role}</p>
@@ -86,22 +95,24 @@ const ModernSidebar = ({ user, menuItems, isCollapsed, onToggleCollapse }) => {
         </div>
       </div>
 
-      {/* Collapse Toggle */}
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={onToggleCollapse}
-          className="w-full flex items-center justify-center space-x-2 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-        >
-          {isCollapsed ? (
-            <FiChevronRight className="w-4 h-4" />
-          ) : (
-            <>
-              <FiChevronLeft className="w-4 h-4" />
-              <span className="text-sm">Collapse</span>
-            </>
-          )}
-        </button>
-      </div>
+      {/* Collapse Toggle - Hidden on Mobile */}
+      {!isMobile && (
+        <div className="p-4 border-t border-gray-200">
+          <button
+            onClick={onToggleCollapse}
+            className="w-full flex items-center justify-center space-x-2 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            {isCollapsed ? (
+              <FiChevronRight className="w-4 h-4" />
+            ) : (
+              <>
+                <FiChevronLeft className="w-4 h-4" />
+                <span className="text-sm">Collapse</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

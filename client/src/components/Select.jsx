@@ -12,7 +12,6 @@ const Select = ({ label, error, options = [], className = 'mb-4', ...props }) =>
         }`}
         {...props}
       >
-        <option value="">Select...</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

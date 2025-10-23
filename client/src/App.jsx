@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { useAuth } from './context/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Motorcycles from './pages/Motorcycles';
@@ -19,44 +20,98 @@ import Notifications from './pages/Notifications';
 import Layout from './components/Layout';
 
 const PrivateRoute = ({ children }) => {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/login" />;
+  const { user, isLoading, isInitialized } = useAuth();
+  
+  // Show loading while authentication is being checked
+  if (!isInitialized || isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Redirect to login if not authenticated
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+};
+
+const PublicRoute = ({ children }) => {
+  const { user, isLoading, isInitialized } = useAuth();
+  
+  // Show loading while authentication is being checked
+  if (!isInitialized || isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Redirect to dashboard if already authenticated
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return children;
 };
 
 function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route path="/" element={
-              <PrivateRoute>
-                <Layout />
-              </PrivateRoute>
-            }>
-            <Route index element={<Dashboard />} />
-            <Route path="motorcycles" element={<Motorcycles />} />
-            <Route path="suppliers" element={<Suppliers />} />
-            <Route path="customers" element={<Customers />} />
-            <Route path="contracts" element={<Contracts />} />
-            <Route path="transport" element={<Transport />} />
-            <Route path="repairs" element={<Repairs />} />
-            <Route path="my-jobs" element={<MyJobs />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="approvals" element={<Approvals />} />
-            <Route path="my-requests" element={<MyRequests />} />
-            <Route path="users" element={<Users />} />
-            <Route path="notifications" element={<Notifications />} />
-            </Route>
-          </Routes>
-        </Router>
-      </NotificationProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NotificationProvider>
+          <Router>
+            <Routes>
+              <Route 
+                path="/login" 
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                } 
+              />
+              
+              <Route 
+                path="/" 
+                element={
+                  <PrivateRoute>
+                    <Layout />
+                  </PrivateRoute>
+                }
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="motorcycles" element={<Motorcycles />} />
+                <Route path="suppliers" element={<Suppliers />} />
+                <Route path="customers" element={<Customers />} />
+                <Route path="contracts" element={<Contracts />} />
+                <Route path="transport" element={<Transport />} />
+                <Route path="repairs" element={<Repairs />} />
+                <Route path="my-jobs" element={<MyJobs />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="approvals" element={<Approvals />} />
+                <Route path="my-requests" element={<MyRequests />} />
+                <Route path="users" element={<Users />} />
+                <Route path="notifications" element={<Notifications />} />
+              </Route>
+              
+              {/* Catch all route */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </NotificationProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
 export default App;
-
-

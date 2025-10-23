@@ -39,11 +39,8 @@ const Users = () => {
     e.preventDefault();
     try {
       if (editingUser) {
-        // Don't send password if it's empty during edit
+        // Always send password field, even if empty (server will handle it)
         const updateData = { ...formData };
-        if (!updateData.password) {
-          delete updateData.password;
-        }
         await axios.put(`/api/users/${editingUser._id}`, updateData);
       } else {
         await axios.post('/api/users', formData);
@@ -51,7 +48,9 @@ const Users = () => {
       fetchUsers();
       handleCloseModal();
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to save user');
+      console.error('Error saving user:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to save user';
+      alert(`Error: ${errorMessage}`);
     }
   };
 
@@ -70,7 +69,7 @@ const Users = () => {
     setEditingUser(user);
     setFormData({
       username: user.username,
-      password: '', // Don't populate password
+      password: '', // Don't populate password for security
       fullName: user.fullName,
       role: user.role,
       email: user.email || '',

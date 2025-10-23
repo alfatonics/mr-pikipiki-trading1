@@ -1,4 +1,5 @@
 import express from 'express';
+import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
@@ -37,18 +38,47 @@ router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { password, ...updateData } = req.body;
     
+    console.log('Updating user:', req.params.id, 'with data:', { ...updateData, password: password ? '[PROVIDED]' : '[NOT PROVIDED]' });
+    
+    // If password is provided and not empty, hash it before updating
+    if (password && password.trim() !== '') {
+      console.log('Hashing new password...');
+      updateData.password = await bcrypt.hash(password, 10);
+    } else {
+      console.log('No password provided, keeping existing password');
+    }
+    
+    // Use findByIdAndUpdate with proper options
     const user = await User.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true, runValidators: true }
+      { 
+        new: true, 
+        runValidators: true,
+        context: 'query' // This helps with validation
+      }
     ).select('-password');
     
     if (!user) {
+      console.log('User not found:', req.params.id);
       return res.status(404).json({ error: 'User not found' });
     }
     
+    console.log('User updated successfully:', user.username);
     res.json(user);
   } catch (error) {
+    console.error('Error updating user:', error);
+    
+    // Handle specific validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ error: `Validation failed: ${errors.join(', ')}` });
+    }
+    
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+    
     res.status(500).json({ error: 'Failed to update user' });
   }
 });

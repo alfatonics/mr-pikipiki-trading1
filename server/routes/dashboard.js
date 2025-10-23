@@ -12,12 +12,16 @@ const router = express.Router();
 // Get dashboard statistics
 router.get('/stats', authenticate, async (req, res) => {
   try {
+    console.log('Dashboard stats requested by user:', req.user.username);
+    
     // Motorcycle statistics
     const totalMotorcycles = await Motorcycle.countDocuments();
     const inStock = await Motorcycle.countDocuments({ status: 'in_stock' });
     const sold = await Motorcycle.countDocuments({ status: 'sold' });
     const inRepair = await Motorcycle.countDocuments({ status: 'in_repair' });
     const inTransit = await Motorcycle.countDocuments({ status: 'in_transit' });
+    
+    console.log('Motorcycle counts:', { totalMotorcycles, inStock, sold, inRepair, inTransit });
     
     // Monthly sales
     const currentMonth = new Date();
@@ -111,7 +115,7 @@ router.get('/stats', authenticate, async (req, res) => {
       .limit(5)
       .select('brand model saleDate sellingPrice customer');
     
-    res.json({
+    const response = {
       motorcycles: {
         total: totalMotorcycles,
         inStock,
@@ -136,7 +140,10 @@ router.get('/stats', authenticate, async (req, res) => {
       },
       totalCustomers,
       recentSales
-    });
+    };
+    
+    console.log('Dashboard response:', JSON.stringify(response, null, 2));
+    res.json(response);
   } catch (error) {
     console.error('Dashboard error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard statistics' });

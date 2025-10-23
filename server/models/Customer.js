@@ -44,6 +44,29 @@ const customerSchema = new mongoose.Schema({
   },
   notes: {
     type: String
+  },
+  // Sales/Pricing Information
+  budgetRange: {
+    type: String,
+    enum: ['under-500k', '500k-1m', '1m-2m', '2m-5m', '5m-10m', 'over-10m'],
+    default: ''
+  },
+  preferredCurrency: {
+    type: String,
+    enum: ['TZS', 'USD', 'EUR'],
+    default: 'TZS'
+  },
+  creditLimit: {
+    type: Number,
+    default: 0
+  },
+  paymentTerms: {
+    type: String,
+    enum: ['cash', 'installment', 'credit', 'lease'],
+    default: 'cash'
+  },
+  salesNotes: {
+    type: String
   }
 }, {
   timestamps: true

@@ -9,7 +9,7 @@ import ModernSidebar from './ModernSidebar';
 import TopBar from './TopBar';
 
 const Layout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading, isInitialized } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -48,6 +48,24 @@ const Layout = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
+  // Show loading state while authentication is being initialized
+  if (!isInitialized || isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If no user after initialization, redirect to login
+  if (!user) {
+    navigate('/login');
+    return null;
+  }
+
   return (
     <div className={`flex h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
       {/* Modern Sidebar */}
@@ -58,6 +76,22 @@ const Layout = () => {
         onToggleCollapse={handleToggleSidebar}
       />
 
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)}></div>
+          <div className="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white shadow-lg overflow-y-auto">
+            <ModernSidebar
+              user={user}
+              menuItems={filteredMenuItems}
+              isCollapsed={false}
+              onToggleCollapse={() => setSidebarOpen(false)}
+              isMobile={true}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300`}>
         {/* Modern Top Bar */}
@@ -66,6 +100,7 @@ const Layout = () => {
           onLogout={handleLogout}
           onToggleTheme={handleToggleTheme}
           isDarkMode={isDarkMode}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
 
         {/* Page Content */}
@@ -78,5 +113,3 @@ const Layout = () => {
 };
 
 export default Layout;
-
-

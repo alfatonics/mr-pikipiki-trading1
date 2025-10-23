@@ -50,6 +50,20 @@ router.get('/me', authenticate, async (req, res) => {
   res.json({ user: req.user });
 });
 
+// Verify token
+router.get('/verify', authenticate, async (req, res) => {
+  res.json({ 
+    valid: true, 
+    user: {
+      id: req.user._id,
+      username: req.user.username,
+      fullName: req.user.fullName,
+      role: req.user.role,
+      email: req.user.email
+    }
+  });
+});
+
 // Change password
 router.post('/change-password', authenticate, async (req, res) => {
   try {

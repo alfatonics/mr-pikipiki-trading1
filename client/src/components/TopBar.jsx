@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
-import { FiSearch, FiBell, FiUser, FiSettings, FiLogOut, FiSun, FiMoon, FiCheck, FiX, FiAlertCircle, FiCheckCircle, FiInfo } from 'react-icons/fi';
+import { FiSearch, FiBell, FiUser, FiSettings, FiLogOut, FiSun, FiMoon, FiCheck, FiX, FiAlertCircle, FiCheckCircle, FiInfo, FiMenu } from 'react-icons/fi';
 
-const TopBar = ({ user, onLogout, onToggleTheme, isDarkMode = false }) => {
+const TopBar = ({ user, onLogout, onToggleTheme, isDarkMode = false, onToggleSidebar }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
@@ -56,10 +56,18 @@ const TopBar = ({ user, onLogout, onToggleTheme, isDarkMode = false }) => {
 
 
   return (
-    <div className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 relative z-10 h-16">
+    <div className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-6 py-4 relative z-10 h-16" style={{borderBottomWidth: '1px', borderBottomColor: '#e5e7eb'}}>
       <div className="flex items-center justify-between h-full">
-        {/* Left side - Date and Search */}
-        <div className="flex items-center space-x-6">
+        {/* Left side - Mobile Menu, Date and Search */}
+        <div className="flex items-center space-x-4">
+          {/* Mobile Menu Button */}
+          <button
+            onClick={onToggleSidebar}
+            className="lg:hidden p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <FiMenu className="h-5 w-5" />
+          </button>
+          
           <div className="hidden md:block">
             <span className="text-sm text-gray-600">{currentDate}</span>
           </div>
@@ -72,7 +80,7 @@ const TopBar = ({ user, onLogout, onToggleTheme, isDarkMode = false }) => {
             <input
               type="text"
               placeholder="Search..."
-              className="block w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-10"
+              className="block w-48 sm:w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-10"
             />
           </div>
         </div>

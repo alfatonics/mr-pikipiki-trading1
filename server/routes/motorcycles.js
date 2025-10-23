@@ -7,6 +7,7 @@ const router = express.Router();
 // Get all motorcycles
 router.get('/', authenticate, async (req, res) => {
   try {
+    console.log('Motorcycles API requested by user:', req.user.username);
     const { status, brand, supplier } = req.query;
     const filter = {};
     
@@ -19,8 +20,10 @@ router.get('/', authenticate, async (req, res) => {
       .populate('customer', 'fullName phone')
       .sort('-createdAt');
     
+    console.log(`Found ${motorcycles.length} motorcycles`);
     res.json(motorcycles);
   } catch (error) {
+    console.error('Motorcycles API error:', error);
     res.status(500).json({ error: 'Failed to fetch motorcycles' });
   }
 });

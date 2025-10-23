@@ -8,9 +8,12 @@ const router = express.Router();
 // Get all suppliers
 router.get('/', authenticate, async (req, res) => {
   try {
+    console.log('Suppliers API requested by user:', req.user.username);
     const suppliers = await Supplier.find().sort('-createdAt');
+    console.log(`Found ${suppliers.length} suppliers`);
     res.json(suppliers);
   } catch (error) {
+    console.error('Suppliers API error:', error);
     res.status(500).json({ error: 'Failed to fetch suppliers' });
   }
 });

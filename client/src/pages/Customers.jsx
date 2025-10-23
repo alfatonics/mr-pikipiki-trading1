@@ -22,7 +22,13 @@ const Customers = () => {
     city: 'Dar es Salaam',
     region: '',
     occupation: '',
-    notes: ''
+    notes: '',
+    // Sales/Pricing Information
+    budgetRange: '',
+    preferredCurrency: 'TZS',
+    creditLimit: '',
+    paymentTerms: 'cash',
+    salesNotes: ''
   });
 
   useEffect(() => {
@@ -101,8 +107,31 @@ const Customers = () => {
   const columns = [
     { header: 'Full Name', accessor: 'fullName' },
     { header: 'Phone', accessor: 'phone' },
-    { header: 'ID Type', accessor: 'idType' },
-    { header: 'ID Number', accessor: 'idNumber' },
+    { header: 'Budget Range', 
+      render: (row) => {
+        const ranges = {
+          'under-500k': 'Under 500K',
+          '500k-1m': '500K - 1M',
+          '1m-2m': '1M - 2M',
+          '2m-5m': '2M - 5M',
+          '5m-10m': '5M - 10M',
+          'over-10m': 'Over 10M'
+        };
+        return ranges[row.budgetRange] || 'Not specified';
+      }
+    },
+    { header: 'Currency', accessor: 'preferredCurrency' },
+    { header: 'Payment Terms', 
+      render: (row) => {
+        const terms = {
+          'cash': 'Cash',
+          'installment': 'Installment',
+          'credit': 'Credit',
+          'lease': 'Lease'
+        };
+        return terms[row.paymentTerms] || 'Cash';
+      }
+    },
     { header: 'City', accessor: 'city' },
     { 
       header: 'Total Purchases', 
@@ -224,13 +253,74 @@ const Customers = () => {
               onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
             />
           </div>
+
+          {/* Sales/Pricing Information Section */}
+          <div className="mt-6 border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales & Pricing Information</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Budget Range"
+                value={formData.budgetRange}
+                onChange={(e) => setFormData({ ...formData, budgetRange: e.target.value })}
+                options={[
+                  { value: '', label: 'Select budget range...' },
+                  { value: 'under-500k', label: 'Under 500,000 TZS' },
+                  { value: '500k-1m', label: '500,000 - 1,000,000 TZS' },
+                  { value: '1m-2m', label: '1,000,000 - 2,000,000 TZS' },
+                  { value: '2m-5m', label: '2,000,000 - 5,000,000 TZS' },
+                  { value: '5m-10m', label: '5,000,000 - 10,000,000 TZS' },
+                  { value: 'over-10m', label: 'Over 10,000,000 TZS' }
+                ]}
+              />
+              <Select
+                label="Preferred Currency"
+                value={formData.preferredCurrency}
+                onChange={(e) => setFormData({ ...formData, preferredCurrency: e.target.value })}
+                options={[
+                  { value: 'TZS', label: 'Tanzanian Shilling (TZS)' },
+                  { value: 'USD', label: 'US Dollar (USD)' },
+                  { value: 'EUR', label: 'Euro (EUR)' }
+                ]}
+              />
+              <Input
+                label="Credit Limit (TZS)"
+                type="number"
+                value={formData.creditLimit}
+                onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
+                placeholder="Enter credit limit amount"
+              />
+              <Select
+                label="Payment Terms"
+                value={formData.paymentTerms}
+                onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                options={[
+                  { value: 'cash', label: 'Cash Payment' },
+                  { value: 'installment', label: 'Installment Plan' },
+                  { value: 'credit', label: 'Credit Account' },
+                  { value: 'lease', label: 'Lease Agreement' }
+                ]}
+              />
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sales Notes</label>
+              <textarea
+                value={formData.salesNotes}
+                onChange={(e) => setFormData({ ...formData, salesNotes: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                rows="3"
+                placeholder="Additional sales information, preferences, or special requirements..."
+              />
+            </div>
+          </div>
+
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">General Notes</label>
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               rows="3"
+              placeholder="General customer notes and information..."
             />
           </div>
           <div className="mt-6 flex justify-end space-x-3">

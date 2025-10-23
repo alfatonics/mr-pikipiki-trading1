@@ -43,26 +43,26 @@ const StatCard = ({ title, value, icon: Icon, color = 'primary', subtitle, trend
   const scheme = colorSchemes[color] || colorSchemes.primary;
 
   return (
-    <Card className={`${scheme.bg} hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border-0 rounded-2xl`}>
+    <Card className={`${scheme.bg} hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border-0 rounded-2xl p-4 sm:p-6`}>
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-2 truncate uppercase tracking-wide">{title}</p>
-          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 truncate tracking-tight font-mono">{value}</h3>
+          <p className="text-xs font-semibold text-gray-600 mb-1 sm:mb-2 truncate uppercase tracking-wide">{title}</p>
+          <h3 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 truncate tracking-tight font-mono">{value}</h3>
           {subtitle && (
-            <p className="text-xs sm:text-sm text-gray-500 truncate font-medium">{subtitle}</p>
+            <p className="text-xs text-gray-500 truncate font-medium">{subtitle}</p>
           )}
           {trend && trendValue && (
-            <div className="flex items-center mt-2">
-              <span className={`text-xs sm:text-sm font-bold ${trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
+            <div className="flex items-center mt-1 sm:mt-2">
+              <span className={`text-xs font-bold ${trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
                 {trend === 'up' ? '↗' : '↘'} {trendValue}
               </span>
-              <span className="text-xs text-gray-500 ml-1 font-medium">vs last month</span>
+              <span className="text-xs text-gray-500 ml-1 font-medium hidden sm:inline">vs last month</span>
             </div>
           )}
         </div>
         {Icon && (
-          <div className={`bg-gradient-to-r ${scheme.gradient} p-4 rounded-2xl text-white flex-shrink-0 ml-4 shadow-lg`}>
-            <Icon className="w-6 h-6" />
+          <div className={`bg-gradient-to-r ${scheme.gradient} p-2 sm:p-4 rounded-xl sm:rounded-2xl text-white flex-shrink-0 ml-2 sm:ml-4 shadow-lg`}>
+            <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
           </div>
         )}
       </div>

@@ -1,12 +1,46 @@
 import express from 'express';
-import PDFDocument from 'pdfkit';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import Contract from '../models/Contract.js';
 import Motorcycle from '../models/Motorcycle.js';
 import Supplier from '../models/Supplier.js';
 import Customer from '../models/Customer.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import contractTemplateService from '../services/contractTemplateService.js';
 
 const router = express.Router();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/contracts';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `contract-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|pdf/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, and PDF files are allowed'));
+    }
+  }
+});
 
 // Generate contract number
 const generateContractNumber = async (type) => {
@@ -16,36 +50,79 @@ const generateContractNumber = async (type) => {
   return `${prefix}-${year}-${String(count + 1).padStart(4, '0')}`;
 };
 
-// Get all contracts
+// Get all contracts with advanced filtering
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { type, status } = req.query;
+    const { 
+      type, 
+      status, 
+      party, 
+      motorcycle, 
+      dateFrom, 
+      dateTo, 
+      signed, 
+      page = 1, 
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
     const filter = {};
     
     if (type) filter.type = type;
     if (status) filter.status = status;
+    if (party) filter.party = party;
+    if (motorcycle) filter.motorcycle = motorcycle;
+    if (dateFrom || dateTo) {
+      filter.date = {};
+      if (dateFrom) filter.date.$gte = new Date(dateFrom);
+      if (dateTo) filter.date.$lte = new Date(dateTo);
+    }
+    if (signed === 'true') {
+      filter['signatures.partySignature.signed'] = true;
+      filter['signatures.companySignature.signed'] = true;
+    }
+    
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     
     const contracts = await Contract.find(filter)
       .populate('motorcycle')
       .populate('party')
-      .populate('createdBy', 'fullName username')
-      .populate('printedBy', 'fullName username')
-      .sort('-createdAt');
+      .populate('createdBy', 'username fullName')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(parseInt(limit));
     
-    res.json(contracts);
+    const total = await Contract.countDocuments(filter);
+    
+    console.log(`Found ${contracts.length} contracts out of ${total} total`);
+    
+    res.json({
+      contracts,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / parseInt(limit)),
+        total,
+        limit: parseInt(limit)
+      }
+    });
   } catch (error) {
+    console.error('Error fetching contracts:', error);
     res.status(500).json({ error: 'Failed to fetch contracts' });
   }
 });
 
-// Get single contract
+// Get contract by ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const contract = await Contract.findById(req.params.id)
       .populate('motorcycle')
       .populate('party')
-      .populate('createdBy', 'fullName username')
-      .populate('printedBy', 'fullName username');
+      .populate('createdBy', 'username fullName')
+      .populate('lastModifiedBy', 'username fullName');
     
     if (!contract) {
       return res.status(404).json({ error: 'Contract not found' });
@@ -53,145 +130,206 @@ router.get('/:id', authenticate, async (req, res) => {
     
     res.json(contract);
   } catch (error) {
+    console.error('Error fetching contract:', error);
     res.status(500).json({ error: 'Failed to fetch contract' });
   }
 });
 
 // Create new contract
-router.post('/', authenticate, authorize('admin', 'sales'), async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
-    // Validate required fields
-    const { type, motorcycle, party, amount, paymentMethod } = req.body;
-    
-    if (!type || !motorcycle || !party || !amount || !paymentMethod) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: type, motorcycle, party, amount, paymentMethod' 
-      });
-    }
-
-    // Check if motorcycle exists
-    const motorcycleExists = await Motorcycle.findById(motorcycle);
-    if (!motorcycleExists) {
-      return res.status(400).json({ error: 'Motorcycle not found' });
-    }
-
-    // Check if party exists
-    const partyModel = type === 'purchase' ? 'Supplier' : 'Customer';
-    const partyExists = await (partyModel === 'Supplier' ? Supplier : Customer).findById(party);
-    if (!partyExists) {
-      return res.status(400).json({ error: `${partyModel} not found` });
-    }
-
-    // For sale contracts, check if motorcycle is available
-    if (type === 'sale' && motorcycleExists.status !== 'in_stock') {
-      return res.status(400).json({ 
-        error: 'Motorcycle is not available for sale. Current status: ' + motorcycleExists.status 
-      });
-    }
-
-    const contractNumber = await generateContractNumber(type);
-    
-    const contract = new Contract({
+    const contractData = {
       ...req.body,
-      partyModel,
-      contractNumber,
-      createdBy: req.user._id
-    });
+      contractNumber: await generateContractNumber(req.body.type),
+      createdBy: req.user._id,
+      effectiveDate: req.body.effectiveDate || new Date(),
+      status: 'draft'
+    };
     
+    const contract = new Contract(contractData);
     await contract.save();
     
-    // Update motorcycle status if it's a sale contract
-    if (type === 'sale') {
-      await Motorcycle.findByIdAndUpdate(motorcycle, {
-        status: 'sold',
-        customer: party,
-        saleDate: req.body.date || new Date(),
-        sellingPrice: amount
-      });
-      
-      // Update customer total purchases
-      await Customer.findByIdAndUpdate(party, {
-        $inc: { totalPurchases: 1 }
-      });
-    } else {
-      // Update supplier total supplied
-      await Supplier.findByIdAndUpdate(party, {
-        $inc: { totalSupplied: 1 }
-      });
-    }
-    
-    const populated = await Contract.findById(contract._id)
+    const populatedContract = await Contract.findById(contract._id)
       .populate('motorcycle')
       .populate('party')
-      .populate('createdBy', 'fullName username');
+      .populate('createdBy', 'username fullName');
     
-    res.status(201).json(populated);
+    res.status(201).json(populatedContract);
   } catch (error) {
-    console.error('Contract creation error:', error);
-    
-    if (error.code === 11000) {
-      return res.status(400).json({ error: 'Contract number already exists' });
+    console.error('Error creating contract:', error);
+    res.status(500).json({ error: 'Failed to create contract' });
+  }
+});
+
+// Create contract with signed document (new workflow)
+router.post('/with-document', authenticate, upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Signed contract document is required' });
     }
+
+    // Parse JSON fields
+    const installmentDetails = req.body.installmentDetails ? JSON.parse(req.body.installmentDetails) : {};
+    const warranties = req.body.warranties ? JSON.parse(req.body.warranties) : [];
+    const penalties = req.body.penalties ? JSON.parse(req.body.penalties) : [];
+
+    const contractData = {
+      type: req.body.type,
+      motorcycle: req.body.motorcycle,
+      party: req.body.party,
+      amount: req.body.amount,
+      currency: req.body.currency,
+      date: req.body.date,
+      effectiveDate: req.body.effectiveDate,
+      expiryDate: req.body.expiryDate,
+      paymentMethod: req.body.paymentMethod,
+      installmentDetails,
+      terms: req.body.terms,
+      warranties,
+      penalties,
+      contractNumber: await generateContractNumber(req.body.type),
+      createdBy: req.user._id,
+      status: req.body.status || 'active', // Contract is active since it's signed
+      documents: [{
+        type: req.body.documentType || 'signed_contract',
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        filePath: req.file.path,
+        uploadedAt: new Date(),
+        uploadedBy: req.user._id,
+        description: req.body.description || 'Signed contract document'
+      }]
+    };
     
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ error: 'Validation error: ' + errors.join(', ') });
-    }
+    const contract = new Contract(contractData);
+    await contract.save();
     
-    res.status(500).json({ error: 'Failed to create contract: ' + error.message });
+    const populatedContract = await Contract.findById(contract._id)
+      .populate('motorcycle')
+      .populate('party')
+      .populate('createdBy', 'username fullName');
+    
+    res.status(201).json(populatedContract);
+  } catch (error) {
+    console.error('Error creating contract with document:', error);
+    res.status(500).json({ error: 'Failed to create contract with document' });
   }
 });
 
 // Update contract
-router.put('/:id', authenticate, authorize('admin', 'sales'), async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   try {
-    const contract = await Contract.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    ).populate('motorcycle party createdBy printedBy');
+    const updateData = {
+      ...req.body,
+      lastModifiedBy: req.user._id
+    };
     
-    if (!contract) {
+    // Add to modification history
+    const contract = await Contract.findById(req.params.id);
+    if (contract) {
+      updateData.$push = {
+        modificationHistory: {
+          modifiedAt: new Date(),
+          modifiedBy: req.user._id,
+          changes: JSON.stringify(req.body),
+          reason: req.body.modificationReason || 'Contract updated'
+        }
+      };
+    }
+    
+    const updatedContract = await Contract.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).populate('motorcycle')
+     .populate('party')
+     .populate('createdBy', 'username fullName')
+     .populate('lastModifiedBy', 'username fullName');
+    
+    if (!updatedContract) {
       return res.status(404).json({ error: 'Contract not found' });
     }
     
-    res.json(contract);
+    res.json(updatedContract);
   } catch (error) {
+    console.error('Error updating contract:', error);
     res.status(500).json({ error: 'Failed to update contract' });
   }
 });
 
-// Mark contract as printed
-router.post('/:id/print', authenticate, authorize('admin', 'secretary'), async (req, res) => {
-  try {
-    const contract = await Contract.findByIdAndUpdate(
-      req.params.id,
-      {
-        printedBy: req.user._id,
-        printedAt: new Date()
-      },
-      { new: true }
-    ).populate('motorcycle party createdBy printedBy');
-    
-    if (!contract) {
-      return res.status(404).json({ error: 'Contract not found' });
-    }
-    
-    res.json(contract);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to mark contract as printed' });
-  }
-});
-
-// Generate PDF contract
+// Generate professional contract PDF
 router.get('/:id/pdf', authenticate, async (req, res) => {
   try {
     console.log('Generating PDF for contract:', req.params.id);
     
     const contract = await Contract.findById(req.params.id)
       .populate('motorcycle')
-      .populate('party')
-      .populate('createdBy', 'fullName');
+      .populate('party');
+    
+    if (!contract) {
+      console.log('Contract not found:', req.params.id);
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    console.log('Contract found:', contract.contractNumber);
+    console.log('Motorcycle data:', contract.motorcycle);
+    console.log('Party data:', contract.party);
+    
+    // Generate PDF using professional template
+    const pdfBuffer = await contractTemplateService.generateContractPDF(
+      contract, 
+      contract.motorcycle, 
+      contract.party
+    );
+    
+    console.log('PDF generation completed, size:', pdfBuffer.length);
+    console.log('PDF buffer type:', typeof pdfBuffer);
+    console.log('PDF buffer is buffer:', Buffer.isBuffer(pdfBuffer));
+    
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error('Generated PDF is empty or invalid');
+    }
+    
+    // Record print history
+    try {
+      await Contract.findByIdAndUpdate(req.params.id, {
+        $push: {
+          printHistory: {
+            printedAt: new Date(),
+            printedBy: req.user._id,
+            printCount: 1,
+            reason: 'Contract PDF generated'
+          }
+        }
+      });
+    } catch (historyError) {
+      console.warn('Failed to record print history:', historyError);
+      // Don't fail the request for this
+    }
+    
+    // Set headers for download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="contract-${contract.contractNumber}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    console.log('Sending PDF response, size:', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to generate PDF: ' + error.message });
+  }
+});
+
+// Preview contract PDF
+router.get('/:id/pdf/preview', authenticate, async (req, res) => {
+  try {
+    console.log('Generating PDF preview for contract:', req.params.id);
+    
+    const contract = await Contract.findById(req.params.id)
+      .populate('motorcycle')
+      .populate('party');
     
     if (!contract) {
       console.log('Contract not found:', req.params.id);
@@ -199,165 +337,277 @@ router.get('/:id/pdf', authenticate, async (req, res) => {
     }
 
     console.log('Contract found:', contract.contractNumber);
+    console.log('Motorcycle:', contract.motorcycle?.brand, contract.motorcycle?.model);
+    console.log('Party:', contract.party?.name || contract.party?.fullName);
     
-    // Set response headers
+    // Generate PDF using professional template
+    const pdfBuffer = await contractTemplateService.generateContractPDF(
+      contract, 
+      contract.motorcycle, 
+      contract.party
+    );
+    
+    console.log('PDF buffer size:', pdfBuffer.length);
+    
+    // Set headers for inline viewing
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=contract-${contract.contractNumber}.pdf`);
+    res.setHeader('Content-Disposition', `inline; filename="contract-${contract.contractNumber}.pdf"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
     
-    // Create PDF document
-    const doc = new PDFDocument({ 
-      margin: 50,
-      size: 'A4'
-    });
-    
-    // Handle PDF generation errors
-    doc.on('error', (error) => {
-      console.error('PDF generation error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'PDF generation failed' });
-      }
-    });
-    
-    // Pipe PDF to response
-    doc.pipe(res);
-
-    // Try to add logo if it exists
-    try {
-      const fs = await import('fs');
-      const path = await import('path');
-      const { fileURLToPath } = await import('url');
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = path.dirname(__filename);
-      
-      const logoPath = path.join(__dirname, '../../client/public/logo.png');
-      
-      console.log('Checking for logo at:', logoPath);
-      
-      if (fs.existsSync(logoPath)) {
-        console.log('Logo found! Adding to PDF...');
-        // Logo exists, add it to PDF centered
-        const logoX = (doc.page.width - 100) / 2;
-        doc.image(logoPath, logoX, doc.y, { width: 100 });
-        doc.moveDown(6);
-      } else {
-        console.log('Logo not found. Using text header.');
-        // No logo, just use text header
-        doc.fontSize(20).text('MR PIKIPIKI TRADING', { align: 'center' });
-        doc.moveDown();
-      }
-    } catch (err) {
-      console.log('Error loading logo:', err.message);
-      // If error loading logo, use text header
-      doc.fontSize(20).text('MR PIKIPIKI TRADING', { align: 'center' });
-      doc.moveDown();
-    }
-
-    doc.fontSize(12).text('Dar es Salaam, Ubungo Riverside-Kibangu', { align: 'center' });
-    doc.moveDown();
-    
-    doc.fontSize(16).text(`${contract.type === 'purchase' ? 'PURCHASE' : 'SALES'} CONTRACT`, { align: 'center', underline: true });
-    doc.moveDown();
-    
-    // Contract details
-    doc.fontSize(12);
-    doc.text(`Contract Number: ${contract.contractNumber || 'N/A'}`);
-    doc.text(`Date: ${contract.date ? new Date(contract.date).toLocaleDateString() : 'N/A'}`);
-    doc.moveDown();
-    
-    // Party details
-    doc.fontSize(14).text(contract.type === 'purchase' ? 'Supplier Details:' : 'Customer Details:', { underline: true });
-    doc.fontSize(12);
-    doc.text(`Name: ${contract.party?.name || contract.party?.fullName || 'N/A'}`);
-    doc.text(`Phone: ${contract.party?.phone || 'N/A'}`);
-    doc.text(`Address: ${contract.party?.address || 'N/A'}`);
-    doc.moveDown();
-    
-    // Motorcycle details
-    doc.fontSize(14).text('Motorcycle Details:', { underline: true });
-    doc.fontSize(12);
-    doc.text(`Brand: ${contract.motorcycle?.brand || 'N/A'}`);
-    doc.text(`Model: ${contract.motorcycle?.model || 'N/A'}`);
-    doc.text(`Year: ${contract.motorcycle?.year || 'N/A'}`);
-    doc.text(`Color: ${contract.motorcycle?.color || 'N/A'}`);
-    doc.text(`Chassis Number: ${contract.motorcycle?.chassisNumber || 'N/A'}`);
-    doc.text(`Engine Number: ${contract.motorcycle?.engineNumber || 'N/A'}`);
-    doc.moveDown();
-    
-    // Financial details
-    doc.fontSize(14).text('Financial Details:', { underline: true });
-    doc.fontSize(12);
-    doc.text(`Amount: TZS ${contract.amount ? contract.amount.toLocaleString() : 'N/A'}`);
-    doc.text(`Payment Method: ${contract.paymentMethod ? contract.paymentMethod.replace('_', ' ').toUpperCase() : 'N/A'}`);
-    
-    if (contract.paymentMethod === 'installment' && contract.installmentDetails) {
-      doc.moveDown(0.5);
-      doc.text(`Down Payment: TZS ${contract.installmentDetails.downPayment ? contract.installmentDetails.downPayment.toLocaleString() : 'N/A'}`);
-      doc.text(`Monthly Payment: TZS ${contract.installmentDetails.monthlyPayment ? contract.installmentDetails.monthlyPayment.toLocaleString() : 'N/A'}`);
-      doc.text(`Duration: ${contract.installmentDetails.duration || 'N/A'} months`);
-    }
-    
-    doc.moveDown();
-    
-    // Terms and conditions
-    if (contract.terms) {
-      doc.fontSize(14).text('Terms and Conditions:', { underline: true });
-      doc.fontSize(10);
-      doc.text(contract.terms);
-      doc.moveDown();
-    }
-    
-    // Signatures
-    doc.moveDown(2);
-    doc.fontSize(12);
-    doc.text('_____________________', 100, doc.y);
-    doc.text('_____________________', 350, doc.y - 12);
-    doc.text('MR PIKIPIKI TRADING', 100, doc.y + 5);
-    doc.text(contract.type === 'purchase' ? 'Supplier Signature' : 'Customer Signature', 350, doc.y - 12);
-    
-    // Finalize PDF
-    doc.end();
-    
-    console.log('PDF generation completed for contract:', contract.contractNumber);
-    
+    res.send(pdfBuffer);
   } catch (error) {
-    console.error('PDF generation error:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to generate PDF: ' + error.message });
-    }
+    console.error('Error generating PDF preview:', error);
+    res.status(500).json({ error: 'Failed to generate PDF preview' });
   }
 });
 
-// Test PDF generation
-router.get('/test-pdf', authenticate, async (req, res) => {
+// Upload signed contract document
+router.post('/:id/upload', authenticate, upload.single('document'), async (req, res) => {
   try {
-    console.log('Testing PDF generation...');
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
     
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=test-contract.pdf');
+    const contract = await Contract.findById(req.params.id);
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
     
-    const doc = new PDFDocument({ margin: 50 });
+    const documentData = {
+      type: req.body.documentType || 'signed_contract',
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      filePath: req.file.path,
+      uploadedAt: new Date(),
+      uploadedBy: req.user._id,
+      description: req.body.description || 'Signed contract document'
+    };
     
-    doc.on('error', (error) => {
-      console.error('Test PDF error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Test PDF failed' });
-      }
+    await Contract.findByIdAndUpdate(req.params.id, {
+      $push: { documents: documentData }
     });
     
-    doc.pipe(res);
-    
-    doc.fontSize(20).text('MR PIKIPIKI TRADING', { align: 'center' });
-    doc.fontSize(12).text('Test PDF Generation', { align: 'center' });
-    doc.moveDown();
-    doc.text('This is a test PDF to verify PDFKit is working correctly.');
-    doc.text('If you can see this, PDF generation is working!');
-    
-    doc.end();
-    
-    console.log('Test PDF generated successfully');
+    res.json({ message: 'Document uploaded successfully', document: documentData });
   } catch (error) {
-    console.error('Test PDF error:', error);
-    res.status(500).json({ error: 'Test PDF failed: ' + error.message });
+    console.error('Error uploading document:', error);
+    res.status(500).json({ error: 'Failed to upload document' });
+  }
+});
+
+// Update contract signatures
+router.post('/:id/signatures', authenticate, async (req, res) => {
+  try {
+    const { signatureType, signatureData, witnessName, witnessSignature } = req.body;
+    
+    const contract = await Contract.findById(req.params.id);
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    const updateData = {};
+    
+    if (signatureType === 'party') {
+      updateData['signatures.partySignature'] = {
+        signed: true,
+        signedAt: new Date(),
+        signatureImage: signatureData,
+        witnessName,
+        witnessSignature
+      };
+    } else if (signatureType === 'company') {
+      updateData['signatures.companySignature'] = {
+        signed: true,
+        signedAt: new Date(),
+        signedBy: req.user._id,
+        signatureImage: signatureData
+      };
+    }
+    
+    // Update contract status based on signatures
+    if (updateData['signatures.partySignature'] || updateData['signatures.companySignature']) {
+      const updatedContract = await Contract.findByIdAndUpdate(req.params.id, updateData, { new: true });
+      
+      // Check if both parties have signed
+      if (updatedContract.signatures.partySignature.signed && updatedContract.signatures.companySignature.signed) {
+        await Contract.findByIdAndUpdate(req.params.id, { status: 'active' });
+      } else {
+        await Contract.findByIdAndUpdate(req.params.id, { status: 'pending_signature' });
+      }
+    }
+    
+    const finalContract = await Contract.findById(req.params.id)
+      .populate('motorcycle')
+      .populate('party');
+    
+    res.json(finalContract);
+  } catch (error) {
+    console.error('Error updating signatures:', error);
+    res.status(500).json({ error: 'Failed to update signatures' });
+  }
+});
+
+// Get contract documents
+router.get('/:id/documents', authenticate, async (req, res) => {
+  try {
+    const contract = await Contract.findById(req.params.id).select('documents');
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    res.json(contract.documents);
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+});
+
+// Preview contract document
+router.get('/:id/documents/:docId/preview', authenticate, async (req, res) => {
+  try {
+    const contract = await Contract.findById(req.params.id);
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    const document = contract.documents.id(req.params.docId);
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ error: 'File not found on server' });
+    }
+    
+    // Determine content type based on file extension
+    const ext = path.extname(document.filePath).toLowerCase();
+    let contentType = 'application/octet-stream';
+    
+    if (ext === '.pdf') {
+      contentType = 'application/pdf';
+    } else if (['.jpg', '.jpeg'].includes(ext)) {
+      contentType = 'image/jpeg';
+    } else if (ext === '.png') {
+      contentType = 'image/png';
+    } else if (ext === '.gif') {
+      contentType = 'image/gif';
+    } else if (ext === '.webp') {
+      contentType = 'image/webp';
+    }
+    
+    // Set headers for inline viewing
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${document.originalName}"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(document.filePath);
+    fileStream.pipe(res);
+    
+    fileStream.on('error', (error) => {
+      console.error('Error streaming file:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to stream document' });
+      }
+    });
+  } catch (error) {
+    console.error('Error previewing document:', error);
+    res.status(500).json({ error: 'Failed to preview document' });
+  }
+});
+
+// Download contract document
+router.get('/:id/documents/:docId', authenticate, async (req, res) => {
+  try {
+    const contract = await Contract.findById(req.params.id);
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    const document = contract.documents.id(req.params.docId);
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({ error: 'File not found on server' });
+    }
+    
+    res.download(document.filePath, document.originalName);
+  } catch (error) {
+    console.error('Error downloading document:', error);
+    res.status(500).json({ error: 'Failed to download document' });
+  }
+});
+
+// Delete contract (Admin only)
+router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const contract = await Contract.findByIdAndDelete(req.params.id);
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    // Clean up uploaded files
+    if (contract.documents) {
+      contract.documents.forEach(doc => {
+        if (fs.existsSync(doc.filePath)) {
+          fs.unlinkSync(doc.filePath);
+        }
+      });
+    }
+    
+    res.json({ message: 'Contract deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting contract:', error);
+    res.status(500).json({ error: 'Failed to delete contract' });
+  }
+});
+
+// Get contract statistics
+router.get('/stats/overview', authenticate, async (req, res) => {
+  try {
+    const stats = await Contract.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalContracts: { $sum: 1 },
+          totalValue: { $sum: '$amount' },
+          activeContracts: {
+            $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+          },
+          completedContracts: {
+            $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+          },
+          pendingSignatures: {
+            $sum: { $cond: [{ $eq: ['$status', 'pending_signature'] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+    
+    const typeStats = await Contract.aggregate([
+      {
+        $group: {
+          _id: '$type',
+          count: { $sum: 1 },
+          totalValue: { $sum: '$amount' }
+        }
+      }
+    ]);
+    
+    res.json({
+      overview: stats[0] || {
+        totalContracts: 0,
+        totalValue: 0,
+        activeContracts: 0,
+        completedContracts: 0,
+        pendingSignatures: 0
+      },
+      byType: typeStats
+    });
+  } catch (error) {
+    console.error('Error fetching contract stats:', error);
+    res.status(500).json({ error: 'Failed to fetch contract statistics' });
   }
 });
 

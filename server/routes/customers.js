@@ -8,9 +8,12 @@ const router = express.Router();
 // Get all customers
 router.get('/', authenticate, async (req, res) => {
   try {
+    console.log('Customers API requested by user:', req.user.username);
     const customers = await Customer.find().sort('-createdAt');
+    console.log(`Found ${customers.length} customers`);
     res.json(customers);
   } catch (error) {
+    console.error('Customers API error:', error);
     res.status(500).json({ error: 'Failed to fetch customers' });
   }
 });

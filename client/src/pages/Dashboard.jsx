@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import StatCard from '../components/StatCard';
 import Card from '../components/Card';
 import ModernChart from '../components/ModernChart';
+import ResponsivePieChart from '../components/ResponsivePieChart';
 import InventoryWidget from '../components/InventoryWidget';
-import NotificationTester from '../components/NotificationTester';
 import { 
   FiPackage, FiDollarSign, FiTrendingUp, FiUsers, 
   FiTruck, FiTool, FiCheckCircle, FiClock, FiAlertCircle,
@@ -17,19 +17,88 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchDashboardData();
+    // Add a small delay to prevent immediate requests
+    const timeoutId = setTimeout(() => {
+      fetchDashboardData();
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
   }, [user]);
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, chartRes] = await Promise.all([
-        axios.get('/api/dashboard/stats'),
-        axios.get('/api/dashboard/charts/monthly-sales')
-      ]);
+      console.log('Fetching dashboard data...');
       
-      setStats(statsRes.data);
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      // Fetch stats first, then charts to avoid conflicts
+      console.log('Fetching dashboard stats...');
+      const statsRes = await axios.get('/api/dashboard/stats', { 
+        signal: controller.signal,
+        timeout: 10000 
+      });
+      
+      // Add small delay between requests to prevent conflicts
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('Fetching chart data...');
+      const chartRes = await axios.get('/api/dashboard/charts/monthly-sales', { 
+        signal: controller.signal,
+        timeout: 10000 
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('Dashboard data fetched successfully');
+      console.log('Stats data:', statsRes.data);
+      console.log('Chart data:', chartRes.data);
+      
+      // Use the API response directly as it matches the expected structure
+      const statsData = statsRes.data;
+      console.log('Raw API response:', statsData);
+      console.log('Motorcycles data:', statsData.motorcycles);
+      console.log('Monthly data:', statsData.monthly);
+      console.log('Total customers:', statsData.totalCustomers);
+      
+      // Ensure the data structure is correct with better debugging
+      const formattedStats = {
+        motorcycles: {
+          total: statsData.motorcycles?.total || 0,
+          inStock: statsData.motorcycles?.inStock || 0,
+          sold: statsData.motorcycles?.sold || 0,
+          inRepair: statsData.motorcycles?.inRepair || 0,
+          inTransit: statsData.motorcycles?.inTransit || 0
+        },
+        monthly: {
+          sales: statsData.monthly?.sales || 0,
+          revenue: statsData.monthly?.revenue || 0,
+          profit: statsData.monthly?.profit || 0,
+          repairExpenses: statsData.monthly?.repairExpenses || 0
+        },
+        repairs: {
+          total: statsData.repairs?.total || 0,
+          monthly: statsData.repairs?.monthly || 0
+        },
+        totalCustomers: statsData.totalCustomers || 0,
+        pending: {
+          transports: statsData.pending?.transports || 0,
+          repairs: statsData.pending?.repairs || 0,
+          approvals: statsData.pending?.approvals || 0
+        },
+        topSuppliers: statsData.topSuppliers || [],
+        recentSales: statsData.recentSales || []
+      };
+      
+      console.log('Formatted stats:', formattedStats);
+      console.log('Motorcycles total:', formattedStats.motorcycles.total);
+      console.log('Monthly sales:', formattedStats.monthly.sales);
+      console.log('Total customers:', formattedStats.totalCustomers);
+      setStats(formattedStats);
       
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const formattedData = chartRes.data.map(item => ({
@@ -40,50 +109,124 @@ const Dashboard = () => {
       setChartData(formattedData);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      
+      // Handle specific error types
+      let errorMessage = 'Failed to load dashboard data. Please try again.';
+      
+      if (error.message?.includes('Request already in progress')) {
+        errorMessage = 'Dashboard is loading. Please wait a moment and refresh the page.';
+        console.log('Request conflict detected, will retry automatically...');
+        
+        // Auto-retry after a delay
+        setTimeout(() => {
+          console.log('Auto-retrying dashboard data fetch...');
+          fetchDashboardData();
+        }, 2000);
+        return;
+      } else if (error.response?.data?.error) {
+        errorMessage = `Failed to load dashboard data: ${error.response.data.error}`;
+      } else if (error.message) {
+        errorMessage = `Failed to load dashboard data: ${error.message}`;
+      }
+      
+      // Only use fallback data if we can't fetch from API
+      console.log('Using fallback dashboard data due to API error');
+      setStats({
+        motorcycles: { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
+        monthly: { sales: 0, revenue: 0, profit: 0, repairExpenses: 0 },
+        repairs: { total: 0, monthly: 0 },
+        totalCustomers: 0,
+        pending: { transports: 0, repairs: 0, approvals: 0 },
+        topSuppliers: [],
+        recentSales: []
+      });
+      setChartData([]);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64">
-      <div className="text-lg text-gray-600">Loading dashboard...</div>
-    </div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              fetchDashboardData();
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Role-based dashboard rendering
   const renderDashboard = () => {
+    // Provide default stats if null
+    const defaultStats = {
+      motorcycles: { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
+      monthly: { sales: 0, revenue: 0 },
+      repairs: { monthly: 0 },
+      totalCustomers: 0,
+      pending: { transports: 0, approvals: 0, repairs: 0 },
+      topSuppliers: [],
+      recentSales: []
+    };
+
+    const safeStats = stats || defaultStats;
+
     switch (user?.role) {
       case 'mechanic':
-        return <MechanicDashboard stats={stats} />;
+        return <MechanicDashboard stats={safeStats} />;
       case 'sales':
-        return <SalesDashboard stats={stats} chartData={chartData} />;
+        return <SalesDashboard stats={safeStats} chartData={chartData} />;
       case 'transport':
-        return <TransportDashboard stats={stats} />;
+        return <TransportDashboard stats={safeStats} />;
       case 'registration':
-        return <RegistrationDashboard stats={stats} />;
+        return <RegistrationDashboard stats={safeStats} />;
       case 'secretary':
-        return <SecretaryDashboard stats={stats} />;
+        return <SecretaryDashboard stats={safeStats} />;
       case 'admin':
-        return <AdminDashboard stats={stats} chartData={chartData} />;
+        return <AdminDashboard stats={safeStats} chartData={chartData} />;
       default:
-        return <StaffDashboard stats={stats} />;
+        return <StaffDashboard stats={safeStats} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Modern Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans">Dashboard</h1>
-            <p className="text-gray-600">Welcome back, <span className="font-semibold text-gray-900">{user?.fullName}</span>!</p>
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 sm:py-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-3 sm:mb-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 font-sans">Dashboard</h1>
+            <p className="text-sm sm:text-base text-gray-600">Welcome back, <span className="font-semibold text-gray-900">{user?.fullName}</span>!</p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-right">
-              <p className="text-sm text-gray-500">Today</p>
-              <p className="text-lg font-semibold text-gray-900">
+              <p className="text-xs sm:text-sm text-gray-500">Today</p>
+              <p className="text-sm sm:text-lg font-semibold text-gray-900">
                 {new Date().toLocaleDateString('en-US', { 
                   weekday: 'long', 
                   month: 'short', 
@@ -96,13 +239,9 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         {renderDashboard()}
         
-        {/* Notification Testing Section - Always Visible */}
-        <div className="mt-8">
-          <NotificationTester />
-        </div>
       </div>
     </div>
   );
@@ -113,7 +252,7 @@ const MechanicDashboard = ({ stats }) => {
   return (
     <>
       {/* Mechanic Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
         <StatCard
           title="My Repairs (In Progress)"
           value={stats?.pending?.repairs || 0}
@@ -209,7 +348,7 @@ const MechanicDashboard = ({ stats }) => {
 const SalesDashboard = ({ stats, chartData }) => {
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
         <StatCard
           title="In Stock"
           value={stats?.motorcycles?.inStock || 0}
@@ -228,8 +367,22 @@ const SalesDashboard = ({ stats, chartData }) => {
           title="Monthly Revenue"
           value={`TZS ${(stats?.monthly?.revenue || 0).toLocaleString('en-US')}`}
           icon={FiDollarSign}
-          color="info"
-          subtitle="This month"
+          color="success"
+          subtitle="Revenue this month"
+        />
+        <StatCard
+          title="Monthly Profit"
+          value={`TZS ${(stats?.monthly?.profit || 0).toLocaleString('en-US')}`}
+          icon={FiTrendingUp}
+          color="success"
+          subtitle="Profit this month"
+        />
+        <StatCard
+          title="Repair Expenses"
+          value={`TZS ${(stats?.monthly?.repairExpenses || 0).toLocaleString('en-US')}`}
+          icon={FiTool}
+          color="warning"
+          subtitle="Expenses this month"
         />
         <StatCard
           title="Pending Approvals"
@@ -240,38 +393,43 @@ const SalesDashboard = ({ stats, chartData }) => {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <Card>
-          <h2 className="text-xl font-semibold mb-4">Monthly Sales Overview</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="sales" fill="#0ea5e9" name="Sales Count" />
-            </BarChart>
-          </ResponsiveContainer>
+          <ResponsivePieChart 
+            data={[
+              { name: 'In Stock', value: stats?.motorcycles?.inStock || 0 },
+              { name: 'Sold', value: stats?.motorcycles?.sold || 0 },
+              { name: 'In Repair', value: stats?.motorcycles?.inRepair || 0 },
+              { name: 'In Transit', value: stats?.motorcycles?.inTransit || 0 }
+            ]}
+            title="Motorcycle Status Distribution"
+            colors={['#10B981', '#3B82F6', '#F59E0B', '#EF4444']}
+          />
         </Card>
 
         <Card>
           <h2 className="text-xl font-semibold mb-4">Recent Sales</h2>
           <div className="space-y-3">
-            {stats?.recentSales?.map((sale) => (
-              <div key={sale._id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium">{sale.brand} {sale.model}</p>
-                  <p className="text-sm text-gray-600">{sale.customer?.fullName || 'N/A'}</p>
+            {stats?.recentSales && stats.recentSales.length > 0 ? (
+              stats.recentSales.map((sale) => (
+                <div key={sale._id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{sale.brand} {sale.model}</p>
+                    <p className="text-sm text-gray-600">{sale.customer?.fullName || 'N/A'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-green-600">TZS {sale.sellingPrice?.toLocaleString('en-US')}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(sale.saleDate).toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold text-green-600">TZS {sale.sellingPrice?.toLocaleString('en-US')}</p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(sale.saleDate).toLocaleDateString()}
-                  </p>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No recent sales data available</p>
               </div>
-            ))}
+            )}
           </div>
         </Card>
       </div>
@@ -283,7 +441,7 @@ const SalesDashboard = ({ stats, chartData }) => {
 const TransportDashboard = ({ stats }) => {
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
         <StatCard
           title="Pending Deliveries"
           value={stats?.pending?.transports || 0}
@@ -458,7 +616,7 @@ const AdminDashboard = ({ stats, chartData }) => {
   return (
     <>
       {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
         <StatCard
           title="Total Motorcycles"
           value={stats?.motorcycles?.total || 0}
@@ -481,17 +639,26 @@ const AdminDashboard = ({ stats, chartData }) => {
           title="Monthly Revenue"
           value={`TZS ${(stats?.monthly?.revenue || 0).toLocaleString('en-US')}`}
           icon={FiDollarSign}
-          color="info"
-          subtitle="This month"
+          color="success"
+          subtitle="Revenue this month"
           trend="up"
           trendValue="+15%"
         />
         <StatCard
+          title="Monthly Profit"
+          value={`TZS ${(stats?.monthly?.profit || 0).toLocaleString('en-US')}`}
+          icon={FiTrendingUp}
+          color="success"
+          subtitle="Profit this month"
+          trend="up"
+          trendValue="+12%"
+        />
+        <StatCard
           title="Repair Expenses"
-          value={`TZS ${(stats?.repairs?.monthly || 0).toLocaleString('en-US')}`}
+          value={`TZS ${(stats?.monthly?.repairExpenses || 0).toLocaleString('en-US')}`}
           icon={FiTool}
-          color="danger"
-          subtitle="This month"
+          color="warning"
+          subtitle="Expenses this month"
           trend="down"
           trendValue="-5%"
         />
@@ -514,7 +681,7 @@ const AdminDashboard = ({ stats, chartData }) => {
       </div>
 
       {/* Charts and Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
         <ModernChart
           data={salesChartData}
           type="bar"
@@ -526,7 +693,7 @@ const AdminDashboard = ({ stats, chartData }) => {
       </div>
 
       {/* Recent Activity and Top Performers */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Top Suppliers</h3>
           <div className="space-y-4">
@@ -584,7 +751,7 @@ const AdminDashboard = ({ stats, chartData }) => {
 const StaffDashboard = ({ stats }) => {
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 md:gap-6 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
         <StatCard
           title="Total Motorcycles"
           value={stats?.motorcycles?.total || 0}
@@ -598,6 +765,20 @@ const StaffDashboard = ({ stats }) => {
           icon={FiTrendingUp}
           color="success"
           subtitle="This month"
+        />
+        <StatCard
+          title="Monthly Profit"
+          value={`TZS ${(stats?.monthly?.profit || 0).toLocaleString('en-US')}`}
+          icon={FiTrendingUp}
+          color="success"
+          subtitle="Profit this month"
+        />
+        <StatCard
+          title="Repair Expenses"
+          value={`TZS ${(stats?.monthly?.repairExpenses || 0).toLocaleString('en-US')}`}
+          icon={FiTool}
+          color="warning"
+          subtitle="Expenses this month"
         />
       </div>
 

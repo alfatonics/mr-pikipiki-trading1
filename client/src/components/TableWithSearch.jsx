@@ -8,15 +8,25 @@ const TableWithSearch = ({ columns, data, onRowClick, searchKeys = [] }) => {
 
   // Filter data based on search
   const filteredData = useMemo(() => {
-    if (!searchTerm) return data;
+    if (!searchTerm || !data || !Array.isArray(data)) return data || [];
     
     return data.filter(row => {
+      if (!row || typeof row !== 'object') return false;
+      
       return searchKeys.some(key => {
         const value = key.includes('.') 
           ? key.split('.').reduce((obj, k) => obj?.[k], row)
           : row[key];
         
-        return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+        // Handle null, undefined, and non-string values safely
+        if (value === null || value === undefined) return false;
+        
+        try {
+          return value.toString().toLowerCase().includes(searchTerm.toLowerCase());
+        } catch (error) {
+          console.warn('Error filtering value:', value, error);
+          return false;
+        }
       });
     });
   }, [data, searchTerm, searchKeys]);
@@ -157,7 +167,20 @@ const TableWithSearch = ({ columns, data, onRowClick, searchKeys = [] }) => {
                     </td>
                     {columns.map((column, colIndex) => (
                       <td key={colIndex} className="px-3 sm:px-4 md:px-6 py-3 text-sm">
-                        {column.render ? column.render(row) : row[column.accessor]}
+                        {(() => {
+                          try {
+                            if (column.render) {
+                              return column.render(row);
+                            } else if (column.accessor) {
+                              const value = row[column.accessor];
+                              return value !== null && value !== undefined ? value : 'N/A';
+                            }
+                            return 'N/A';
+                          } catch (error) {
+                            console.warn('Error rendering table cell:', error, { column, row });
+                            return 'Error';
+                          }
+                        })()}
                       </td>
                     ))}
                   </tr>
