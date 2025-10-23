@@ -17,25 +17,63 @@ const Login = () => {
   const testAPIConnection = async () => {
     try {
       console.log('Testing API connection...');
-      const response = await fetch('/api/auth/verify', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+      
+      // Test multiple endpoints to find what works
+      const endpoints = [
+        '/api/auth/verify',
+        '/api/dashboard/',
+        '/api/motorcycles',
+        '/api/customers'
+      ];
+      
+      let workingEndpoint = null;
+      let lastError = null;
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`Testing endpoint: ${endpoint}`);
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-Mobile-Request': 'true'
+            }
+          });
+          
+          const result = {
+            endpoint,
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            url: response.url,
+            headers: Object.fromEntries(response.headers.entries())
+          };
+          
+          console.log(`Endpoint ${endpoint} result:`, result);
+          
+          if (response.ok || response.status === 401) {
+            // 401 is expected for protected routes, but means API is reachable
+            workingEndpoint = endpoint;
+            setDebugInfo(`API Test: ${endpoint} - ${response.status} ${response.statusText} - API REACHABLE`);
+            return result;
+          }
+          
+        } catch (error) {
+          console.error(`Endpoint ${endpoint} error:`, error);
+          lastError = error;
         }
-      });
+      }
       
-      const result = {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        url: response.url,
-        headers: Object.fromEntries(response.headers.entries())
-      };
+      // If no endpoint worked, show the last error
+      if (lastError) {
+        setDebugInfo(`API Test: ALL ENDPOINTS FAILED - ${lastError.message}`);
+        return { error: lastError.message };
+      }
       
-      console.log('API Test Result:', result);
-      setDebugInfo(`API Test: ${response.status} ${response.statusText} - ${response.ok ? 'SUCCESS' : 'FAILED'}`);
-      return result;
+      setDebugInfo(`API Test: NO WORKING ENDPOINTS FOUND`);
+      return { error: 'No working endpoints found' };
+      
     } catch (error) {
       console.error('API Test Error:', error);
       setDebugInfo(`API Test: FAILED - ${error.message}`);
@@ -193,18 +231,39 @@ const Login = () => {
               {loading ? 'Logging in...' : 'Login'}
             </Button>
             
-            {/* Test Login Button for Debugging */}
-            <button
-              type="button"
-              onClick={() => {
-                setUsername('mechanic1');
-                setPassword('password123');
-                setDebugInfo('Test credentials filled. Click Login to test.');
-              }}
-              className="w-full mt-1 px-3 py-2 bg-green-100 text-green-700 text-xs rounded-lg hover:bg-green-200 transition-colors"
-            >
-              🧪 Fill Test Credentials
-            </button>
+                    {/* Test Login Button for Debugging */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsername('mechanic1');
+                        setPassword('password123');
+                        setDebugInfo('Test credentials filled. Click Login to test.');
+                      }}
+                      className="w-full mt-1 px-3 py-2 bg-green-100 text-green-700 text-xs rounded-lg hover:bg-green-200 transition-colors"
+                    >
+                      🧪 Fill Test Credentials
+                    </button>
+                    
+                    {/* Mobile Login Test Button */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setUsername('mechanic1');
+                        setPassword('password123');
+                        setDebugInfo('Testing mobile login...');
+                        
+                        try {
+                          // Test login directly
+                          await login('mechanic1', 'password123');
+                          setDebugInfo('Mobile login test: SUCCESS!');
+                        } catch (error) {
+                          setDebugInfo(`Mobile login test: FAILED - ${error.message}`);
+                        }
+                      }}
+                      className="w-full mt-1 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded-lg hover:bg-blue-200 transition-colors"
+                    >
+                      📱 Test Mobile Login
+                    </button>
             
             {/* Mobile Debug Button */}
             <button

@@ -49,6 +49,8 @@ axios.interceptors.request.use(
     console.log('URL:', config.url);
     console.log('Method:', config.method);
     console.log('Headers:', config.headers);
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
     
     // Skip rate limiting for login requests
     if (config.url?.includes('/auth/login')) {
@@ -58,7 +60,7 @@ axios.interceptors.request.use(
     
     // Skip rate limiting for dashboard requests
     if (config.url?.includes('/dashboard/')) {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       console.log('Dashboard request - token check:', token ? 'Present' : 'Missing');
       if (token && isTokenValid(token)) {
         config.headers.Authorization = `Bearer ${token}`;
