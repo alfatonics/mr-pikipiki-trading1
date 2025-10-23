@@ -4,7 +4,7 @@ import {
   FiHome, FiPackage, FiUsers, FiUserCheck, FiFileText, 
   FiTruck, FiTool, FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX, FiCheckCircle, FiClock, FiBell 
 } from 'react-icons/fi';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ModernSidebar from './ModernSidebar';
 import TopBar from './TopBar';
 
@@ -14,6 +14,17 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Debug logging
+  console.log('Layout render:', { user, isLoading, isInitialized });
+
+  // Handle navigation in useEffect to avoid warnings
+  useEffect(() => {
+    if (isInitialized && !isLoading && user && (!user.username || !user.role)) {
+      console.log('Layout: Invalid user data, redirecting to login', { user });
+      navigate('/login');
+    }
+  }, [user, isLoading, isInitialized, navigate]);
 
   const menuItems = [
     { path: '/', icon: FiHome, label: 'Dashboard', roles: ['all'] },
@@ -50,6 +61,7 @@ const Layout = () => {
 
   // Show loading state while authentication is being initialized
   if (!isInitialized || isLoading) {
+    console.log('Layout: Showing loading state', { isInitialized, isLoading });
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -62,16 +74,27 @@ const Layout = () => {
 
   // If no user after initialization, redirect to login
   if (!user) {
-    console.log('No user found, redirecting to login');
-    navigate('/login');
-    return null;
+    console.log('Layout: No user found, redirecting to login', { user, isInitialized, isLoading });
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Additional security check - ensure user has required properties
-  if (!user.username || !user.role) {
-    console.log('Invalid user data, redirecting to login');
-    navigate('/login');
-    return null;
+  // Show loading if user data is invalid
+  if (user && (!user.username || !user.role)) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

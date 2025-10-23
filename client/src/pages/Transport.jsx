@@ -14,6 +14,7 @@ const Transport = () => {
   const [customers, setCustomers] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     motorcycle: '',
     customer: '',
@@ -41,16 +42,31 @@ const Transport = () => {
 
   const fetchData = async () => {
     try {
+      setLoading(true);
+      console.log('Transport: Fetching data...');
+      
       const [bikesRes, customersRes, driversRes] = await Promise.all([
-        axios.get('/api/motorcycles?status=sold'),
+        axios.get('/api/motorcycles?status=sold'), // Only sold motorcycles need transport
         axios.get('/api/customers'),
         axios.get('/api/users/by-role/transport')
       ]);
-      setMotorcycles(bikesRes.data);
-      setCustomers(customersRes.data);
-      setDrivers(driversRes.data);
+      
+      console.log('Transport: Data loaded successfully');
+      console.log('Motorcycles:', bikesRes.data?.length || 0);
+      console.log('Customers:', customersRes.data?.length || 0);
+      console.log('Drivers:', driversRes.data?.length || 0);
+      
+      setMotorcycles(bikesRes.data || []);
+      setCustomers(customersRes.data || []);
+      setDrivers(driversRes.data || []);
+      
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Transport: Error fetching data:', error);
+      setMotorcycles([]);
+      setCustomers([]);
+      setDrivers([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -139,6 +155,18 @@ const Transport = () => {
     }
   ];
 
+  // Debug logging
+  console.log('Transport: Current state:', {
+    motorcycles: motorcycles.length,
+    customers: customers.length,
+    drivers: drivers.length,
+    transports: transports.length
+  });
+  
+  console.log('Transport: Motorcycles data:', motorcycles);
+  console.log('Transport: Customers data:', customers);
+  console.log('Transport: Drivers data:', drivers);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Modern Header */}
@@ -147,11 +175,19 @@ const Transport = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans tracking-tight">Transport & Delivery</h1>
             <p className="text-gray-600">Schedule and manage motorcycle deliveries</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {loading ? 'Loading data...' : `Data: ${motorcycles.length} motorcycles, ${customers.length} customers, ${drivers.length} drivers`}
+            </p>
           </div>
-          <Button onClick={() => setModalOpen(true)}>
-            <FiPlus className="inline mr-2" />
-            Schedule Transport
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={fetchData} variant="outline" disabled={loading}>
+              {loading ? 'Loading...' : 'Refresh Data'}
+            </Button>
+            <Button onClick={() => setModalOpen(true)}>
+              <FiPlus className="inline mr-2" />
+              Schedule Transport
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -173,34 +209,46 @@ const Transport = () => {
         size="lg"
       >
         <form onSubmit={handleSubmit}>
+          {console.log('Modal: Motorcycles for dropdown:', motorcycles)}
+          {console.log('Modal: Customers for dropdown:', customers)}
+          {console.log('Modal: Drivers for dropdown:', drivers)}
           <Select
             label="Motorcycle"
             value={formData.motorcycle}
             onChange={(e) => setFormData({ ...formData, motorcycle: e.target.value })}
-            options={motorcycles.map(m => ({ 
-              value: m._id, 
-              label: `${m.brand} ${m.model} - ${m.chassisNumber}` 
-            }))}
+            options={[
+              { value: '', label: 'Select a motorcycle...' },
+              ...(motorcycles || []).map(m => ({ 
+                value: m._id, 
+                label: `${m.brand} ${m.model} - ${m.chassisNumber}` 
+              }))
+            ]}
             required
           />
           <Select
             label="Customer"
             value={formData.customer}
             onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
-            options={customers.map(c => ({ 
-              value: c._id, 
-              label: `${c.fullName} - ${c.phone}` 
-            }))}
+            options={[
+              { value: '', label: 'Select a customer...' },
+              ...(customers || []).map(c => ({ 
+                value: c._id, 
+                label: `${c.fullName} - ${c.phone}` 
+              }))
+            ]}
             required
           />
           <Select
             label="Driver"
             value={formData.driver}
             onChange={(e) => setFormData({ ...formData, driver: e.target.value })}
-            options={drivers.map(d => ({ 
-              value: d._id, 
-              label: d.fullName 
-            }))}
+            options={[
+              { value: '', label: 'Select a driver...' },
+              ...(drivers || []).map(d => ({ 
+                value: d._id, 
+                label: d.fullName 
+              }))
+            ]}
             required
           />
           <Input

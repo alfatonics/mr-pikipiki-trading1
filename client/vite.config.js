@@ -11,7 +11,7 @@ export default defineConfig({
       '.ngrok.io'
     ],
     hmr: {
-      clientPort: 443 // For tunnels
+      clientPort: 3000 // Use same port as server
     },
     proxy: {
       '/api': {

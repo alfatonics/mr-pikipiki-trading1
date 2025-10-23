@@ -1,6 +1,36 @@
 import Card from './Card';
 
-const StatCard = ({ title, value, icon: Icon, color = 'primary', subtitle, trend, trendValue }) => {
+const StatCard = ({ title, value, icon: Icon, color = 'primary', subtitle, trend, trendValue, format = 'number' }) => {
+  // Format numbers based on type
+  const formatValue = (val, formatType) => {
+    if (val === null || val === undefined || val === '') return '0';
+    
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return '0';
+    
+    switch (formatType) {
+      case 'currency':
+        return new Intl.NumberFormat('en-TZ', {
+          style: 'currency',
+          currency: 'TZS',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(num);
+      case 'compact':
+        if (num >= 1000000) {
+          return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+          return (num / 1000).toFixed(1) + 'K';
+        }
+        return num.toString();
+      case 'percentage':
+        return num + '%';
+      default:
+        return new Intl.NumberFormat('en-US').format(num);
+    }
+  };
+
+  const formattedValue = formatValue(value, format);
   const colorSchemes = {
     primary: {
       gradient: 'from-blue-500 to-blue-600',
@@ -47,7 +77,7 @@ const StatCard = ({ title, value, icon: Icon, color = 'primary', subtitle, trend
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-gray-600 mb-1 sm:mb-2 truncate uppercase tracking-wide">{title}</p>
-          <h3 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 truncate tracking-tight font-mono">{value}</h3>
+          <h3 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 truncate tracking-tight font-mono">{formattedValue}</h3>
           {subtitle && (
             <p className="text-xs text-gray-500 truncate font-medium">{subtitle}</p>
           )}

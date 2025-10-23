@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -9,8 +10,26 @@ import TableWithSearch from '../components/TableWithSearch';
 import { FiPlus, FiEdit, FiTrash2, FiFileText } from 'react-icons/fi';
 
 const Motorcycles = () => {
+  const { user } = useAuth();
   const [motorcycles, setMotorcycles] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  
+  // Debug suppliers state
+  console.log('Suppliers state:', suppliers);
+  console.log('Suppliers length:', suppliers.length);
+  console.log('User authentication:', user);
+  
+  // Manual test function
+  const testSuppliersAPI = async () => {
+    console.log('Manual test: Fetching suppliers...');
+    try {
+      const response = await axios.get('/api/suppliers');
+      console.log('Manual test - Suppliers response:', response.data);
+      console.log('Manual test - Suppliers count:', response.data.length);
+    } catch (error) {
+      console.error('Manual test - Error fetching suppliers:', error);
+    }
+  };
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMotorcycle, setEditingMotorcycle] = useState(null);
   const [formData, setFormData] = useState({
@@ -30,9 +49,12 @@ const Motorcycles = () => {
   });
 
   useEffect(() => {
-    fetchMotorcycles();
-    fetchSuppliers();
-  }, []);
+    console.log('Motorcycles useEffect - user:', user);
+    if (user) {
+      fetchMotorcycles();
+      fetchSuppliers();
+    }
+  }, [user]);
 
   const fetchMotorcycles = async () => {
     try {
@@ -45,10 +67,13 @@ const Motorcycles = () => {
 
   const fetchSuppliers = async () => {
     try {
+      console.log('Fetching suppliers...');
       const response = await axios.get('/api/suppliers');
-      setSuppliers(response.data);
+      console.log('Suppliers loaded:', response.data?.length || 0);
+      setSuppliers(response.data || []);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
+      setSuppliers([]);
     }
   };
 
@@ -184,10 +209,15 @@ const Motorcycles = () => {
             <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans tracking-tight">Motorcycles</h1>
             <p className="text-gray-600">Manage motorcycle inventory and details</p>
           </div>
-          <Button onClick={() => setModalOpen(true)}>
-            <FiPlus className="inline mr-2" />
-            Add Motorcycle
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={testSuppliersAPI} variant="outline">
+              Test Suppliers API
+            </Button>
+            <Button onClick={() => setModalOpen(true)}>
+              <FiPlus className="inline mr-2" />
+              Add Motorcycle
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -264,7 +294,13 @@ const Motorcycles = () => {
               label="Supplier"
               value={formData.supplier}
               onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-              options={suppliers.map(s => ({ value: s._id, label: s.name }))}
+              options={[
+                { value: '', label: 'Select a supplier...' },
+                ...suppliers.map(s => {
+                  console.log('Supplier mapping:', { id: s._id, name: s.name });
+                  return { value: s._id, label: s.name };
+                })
+              ]}
               required
             />
             <Input

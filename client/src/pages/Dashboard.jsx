@@ -19,6 +19,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Debug logging
+  console.log('Dashboard render:', { user, loading, error, stats });
+
   useEffect(() => {
     // Add a small delay to prevent immediate requests
     const timeoutId = setTimeout(() => {
@@ -32,119 +35,87 @@ const Dashboard = () => {
     try {
       console.log('Fetching dashboard data...');
       
-      // Add timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      // Don't set fallback data immediately, let it load properly
       
-      // Fetch stats first, then charts to avoid conflicts
-      console.log('Fetching dashboard stats...');
-      const statsRes = await axios.get('/api/dashboard/stats', { 
-        signal: controller.signal,
-        timeout: 10000 
-      });
-      
-      // Add small delay between requests to prevent conflicts
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log('Fetching chart data...');
-      const chartRes = await axios.get('/api/dashboard/charts/monthly-sales', { 
-        signal: controller.signal,
-        timeout: 10000 
-      });
-      
-      clearTimeout(timeoutId);
-      
-      console.log('Dashboard data fetched successfully');
-      console.log('Stats data:', statsRes.data);
-      console.log('Chart data:', chartRes.data);
-      
-      // Use the API response directly as it matches the expected structure
-      const statsData = statsRes.data;
-      console.log('Raw API response:', statsData);
-      console.log('Motorcycles data:', statsData.motorcycles);
-      console.log('Monthly data:', statsData.monthly);
-      console.log('Total customers:', statsData.totalCustomers);
-      
-      // Ensure the data structure is correct with better debugging
-      const formattedStats = {
-        motorcycles: {
-          total: statsData.motorcycles?.total || 0,
-          inStock: statsData.motorcycles?.inStock || 0,
-          sold: statsData.motorcycles?.sold || 0,
-          inRepair: statsData.motorcycles?.inRepair || 0,
-          inTransit: statsData.motorcycles?.inTransit || 0
-        },
-        monthly: {
-          sales: statsData.monthly?.sales || 0,
-          revenue: statsData.monthly?.revenue || 0,
-          profit: statsData.monthly?.profit || 0,
-          repairExpenses: statsData.monthly?.repairExpenses || 0
-        },
-        repairs: {
-          total: statsData.repairs?.total || 0,
-          monthly: statsData.repairs?.monthly || 0
-        },
-        totalCustomers: statsData.totalCustomers || 0,
-        pending: {
-          transports: statsData.pending?.transports || 0,
-          repairs: statsData.pending?.repairs || 0,
-          approvals: statsData.pending?.approvals || 0
-        },
-        topSuppliers: statsData.topSuppliers || [],
-        recentSales: statsData.recentSales || []
-      };
-      
-      console.log('Formatted stats:', formattedStats);
-      console.log('Motorcycles total:', formattedStats.motorcycles.total);
-      console.log('Monthly sales:', formattedStats.monthly.sales);
-      console.log('Total customers:', formattedStats.totalCustomers);
-      setStats(formattedStats);
-      
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const formattedData = chartRes.data.map(item => ({
-        month: monthNames[item.month - 1],
-        sales: item.count,
-        revenue: item.revenue
-      }));
-      setChartData(formattedData);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      console.error('Error details:', error.response?.data || error.message);
-      
-      // Handle specific error types
-      let errorMessage = 'Failed to load dashboard data. Please try again.';
-      
-      if (error.message?.includes('Request already in progress')) {
-        errorMessage = 'Dashboard is loading. Please wait a moment and refresh the page.';
-        console.log('Request conflict detected, will retry automatically...');
+      // Try to fetch real data with shorter timeout
+      try {
+        console.log('Fetching dashboard stats...');
+        console.log('Axios baseURL:', axios.defaults.baseURL);
+        console.log('Making request to:', '/api/dashboard/stats');
         
-        // Auto-retry after a delay
-        setTimeout(() => {
-          console.log('Auto-retrying dashboard data fetch...');
-          fetchDashboardData();
-        }, 2000);
-        return;
-      } else if (error.response?.data?.error) {
-        errorMessage = `Failed to load dashboard data: ${error.response.data.error}`;
-      } else if (error.message) {
-        errorMessage = `Failed to load dashboard data: ${error.message}`;
-      }
+        const statsRes = await axios.get('/api/dashboard/stats', { 
+          timeout: 3000 
+        });
+        
+        console.log('API Response received:', statsRes.status);
       
-      // Only use fallback data if we can't fetch from API
-      console.log('Using fallback dashboard data due to API error');
-      setStats({
-        motorcycles: { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
-        monthly: { sales: 0, revenue: 0, profit: 0, repairExpenses: 0 },
-        repairs: { total: 0, monthly: 0 },
-        totalCustomers: 0,
-        pending: { transports: 0, repairs: 0, approvals: 0 },
-        topSuppliers: [],
-        recentSales: []
-      });
-      setChartData([]);
-      setError(errorMessage);
-    } finally {
+        console.log('Dashboard data fetched successfully');
+        console.log('Stats data:', statsRes.data);
+        console.log('Stats data type:', typeof statsRes.data);
+        console.log('Stats data keys:', Object.keys(statsRes.data || {}));
+        console.log('Response status:', statsRes.status);
+        console.log('Response headers:', statsRes.headers);
+        
+        // Update with real data - API already returns the correct structure
+        const statsData = statsRes.data;
+        console.log('Raw API data structure:', statsData);
+        
+        // The API already returns the data in the correct format, just use it directly
+        const formattedStats = {
+          motorcycles: statsData.motorcycles || { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
+          monthly: statsData.monthly || { sales: 0, revenue: 0, profit: 0, repairExpenses: 0 },
+          repairs: statsData.repairs || { total: 0, monthly: 0 },
+          totalCustomers: statsData.totalCustomers || 0,
+          pending: statsData.pending || { transports: 0, repairs: 0, approvals: 0 },
+          topSuppliers: statsData.topSuppliers || [],
+          recentSales: statsData.recentSales || []
+        };
+        
+        console.log('Setting formatted stats:', formattedStats);
+        console.log('Motorcycles total:', formattedStats.motorcycles.total);
+        console.log('Monthly sales:', formattedStats.monthly.sales);
+        console.log('Monthly revenue:', formattedStats.monthly.revenue);
+        console.log('Total customers:', formattedStats.totalCustomers);
+        setStats(formattedStats);
+        setLoading(false);
+        
+        // Try to fetch chart data
+        try {
+          const chartRes = await axios.get('/api/dashboard/charts/monthly-sales', { 
+            timeout: 3000 
+          });
+          
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const formattedData = chartRes.data.map(item => ({
+            month: monthNames[item.month - 1],
+            sales: item.count,
+            revenue: item.revenue
+          }));
+          setChartData(formattedData);
+        } catch (chartError) {
+          console.log('Chart data fetch failed, using empty data');
+        }
+        
+      } catch (apiError) {
+        console.log('API fetch failed, using fallback data:', apiError.message);
+        // Set fallback data only if API fails
+        const fallbackStats = {
+          motorcycles: { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
+          monthly: { sales: 0, revenue: 0, profit: 0, repairExpenses: 0 },
+          repairs: { total: 0, monthly: 0 },
+          totalCustomers: 0,
+          pending: { transports: 0, repairs: 0, approvals: 0 },
+          topSuppliers: [],
+          recentSales: []
+        };
+        setStats(fallbackStats);
+        setChartData([]);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error in fetchDashboardData:', error);
       setLoading(false);
+      setError(null); // Don't show error, just use fallback data
     }
   };
 
@@ -159,30 +130,25 @@ const Dashboard = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Dashboard</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => {
-              setError(null);
-              setLoading(true);
-              fetchDashboardData();
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Don't show error state, just use fallback data
 
   // Role-based dashboard rendering
   const renderDashboard = () => {
+    // Show loading state
+    if (loading) {
+      return (
+        <div className="p-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to MR PIKIPIKI TRADING</h1>
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="text-gray-600 ml-3">Loading dashboard data...</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // Provide default stats if null
     const defaultStats = {
       motorcycles: { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
@@ -194,7 +160,40 @@ const Dashboard = () => {
       recentSales: []
     };
 
-    const safeStats = stats || defaultStats;
+    // If no stats after loading, show a message
+    if (!stats) {
+      return (
+        <div className="p-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to MR PIKIPIKI TRADING</h1>
+            <p className="text-gray-600">No data available. Please check your connection.</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Use stats if available, otherwise use default
+    const safeStats = stats && Object.keys(stats).length > 0 ? stats : defaultStats;
+    
+    console.log('Dashboard render - stats:', stats);
+    console.log('Dashboard render - safeStats:', safeStats);
+    console.log('Dashboard render - motorcycles total:', safeStats.motorcycles?.total);
+    console.log('Dashboard render - monthly sales:', safeStats.monthly?.sales);
+    console.log('Dashboard render - total customers:', safeStats.totalCustomers);
+    console.log('Dashboard render - user role:', user?.role);
+    console.log('Dashboard render - loading:', loading);
+    console.log('Dashboard render - error:', error);
+    
+    // Debug the data structure
+    if (stats) {
+      console.log('Stats structure:', {
+        motorcycles: stats.motorcycles,
+        monthly: stats.monthly,
+        totalCustomers: stats.totalCustomers,
+        pending: stats.pending
+      });
+    }
+    
 
     switch (user?.role) {
       case 'mechanic':
@@ -241,7 +240,6 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="p-3 sm:p-4">
         {renderDashboard()}
-        
       </div>
     </div>
   );
@@ -346,6 +344,37 @@ const MechanicDashboard = ({ stats }) => {
 
 // Sales Dashboard
 const SalesDashboard = ({ stats, chartData }) => {
+  // Create pie chart data for sales performance
+  const totalSales = (stats?.motorcycles?.inStock || 0) + (stats?.monthly?.sales || 0) + 
+                   (stats?.motorcycles?.inTransit || 0) + (stats?.motorcycles?.reserved || 0);
+  
+  const salesPieData = [
+    { 
+      name: 'In Stock', 
+      value: stats?.motorcycles?.inStock || 0, 
+      color: '#10B981',
+      percentage: totalSales > 0 ? ((stats?.motorcycles?.inStock || 0) / totalSales * 100) : 0
+    },
+    { 
+      name: 'Sold This Month', 
+      value: stats?.monthly?.sales || 0, 
+      color: '#3B82F6',
+      percentage: totalSales > 0 ? ((stats?.monthly?.sales || 0) / totalSales * 100) : 0
+    },
+    { 
+      name: 'In Transit', 
+      value: stats?.motorcycles?.inTransit || 0, 
+      color: '#8B5CF6',
+      percentage: totalSales > 0 ? ((stats?.motorcycles?.inTransit || 0) / totalSales * 100) : 0
+    },
+    { 
+      name: 'Reserved', 
+      value: stats?.motorcycles?.reserved || 0, 
+      color: '#F59E0B',
+      percentage: totalSales > 0 ? ((stats?.motorcycles?.reserved || 0) / totalSales * 100) : 0
+    }
+  ].filter(item => item.value > 0); // Only show items with values > 0
+
   return (
     <>
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
@@ -355,6 +384,7 @@ const SalesDashboard = ({ stats, chartData }) => {
           icon={FiPackage}
           color="success"
           subtitle="Ready to sell"
+          format="number"
         />
         <StatCard
           title="Monthly Sales"
@@ -362,27 +392,31 @@ const SalesDashboard = ({ stats, chartData }) => {
           icon={FiTrendingUp}
           color="primary"
           subtitle="This month"
+          format="number"
         />
         <StatCard
           title="Monthly Revenue"
-          value={`TZS ${(stats?.monthly?.revenue || 0).toLocaleString('en-US')}`}
+          value={stats?.monthly?.revenue || 0}
           icon={FiDollarSign}
           color="success"
           subtitle="Revenue this month"
+          format="currency"
         />
         <StatCard
           title="Monthly Profit"
-          value={`TZS ${(stats?.monthly?.profit || 0).toLocaleString('en-US')}`}
+          value={stats?.monthly?.profit || 0}
           icon={FiTrendingUp}
           color="success"
           subtitle="Profit this month"
+          format="currency"
         />
         <StatCard
           title="Repair Expenses"
-          value={`TZS ${(stats?.monthly?.repairExpenses || 0).toLocaleString('en-US')}`}
+          value={stats?.monthly?.repairExpenses || 0}
           icon={FiTool}
           color="warning"
           subtitle="Expenses this month"
+          format="currency"
         />
         <StatCard
           title="Pending Approvals"
@@ -390,6 +424,7 @@ const SalesDashboard = ({ stats, chartData }) => {
           icon={FiClock}
           color="warning"
           subtitle="Need your review"
+          format="number"
         />
       </div>
 
@@ -431,6 +466,14 @@ const SalesDashboard = ({ stats, chartData }) => {
               </div>
             )}
           </div>
+        </Card>
+      </div>
+
+      {/* Sales Performance Pie Chart */}
+      <div className="mb-6">
+        <Card>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Performance Overview</h3>
+          <ResponsivePieChart data={salesPieData} height={300} />
         </Card>
       </div>
     </>
@@ -600,18 +643,70 @@ const SecretaryDashboard = ({ stats }) => {
 
 // Admin Dashboard (Full Access)
 const AdminDashboard = ({ stats, chartData }) => {
-  const salesChartData = chartData.map(item => ({
-    name: item.month,
-    value: item.sales,
-    revenue: item.revenue
-  }));
+  // Create pie chart data for motorcycle inventory
+  const totalInventory = (stats?.motorcycles?.inStock || 0) + (stats?.motorcycles?.sold || 0) + 
+                       (stats?.motorcycles?.inRepair || 0) + (stats?.motorcycles?.inTransit || 0) + 
+                       (stats?.motorcycles?.reserved || 0);
+  
+  const inventoryPieData = [
+    { 
+      name: 'In Stock', 
+      value: stats?.motorcycles?.inStock || 0, 
+      color: '#10B981',
+      percentage: totalInventory > 0 ? ((stats?.motorcycles?.inStock || 0) / totalInventory * 100) : 0
+    },
+    { 
+      name: 'Sold', 
+      value: stats?.motorcycles?.sold || 0, 
+      color: '#3B82F6',
+      percentage: totalInventory > 0 ? ((stats?.motorcycles?.sold || 0) / totalInventory * 100) : 0
+    },
+    { 
+      name: 'In Repair', 
+      value: stats?.motorcycles?.inRepair || 0, 
+      color: '#F59E0B',
+      percentage: totalInventory > 0 ? ((stats?.motorcycles?.inRepair || 0) / totalInventory * 100) : 0
+    },
+    { 
+      name: 'In Transit', 
+      value: stats?.motorcycles?.inTransit || 0, 
+      color: '#8B5CF6',
+      percentage: totalInventory > 0 ? ((stats?.motorcycles?.inTransit || 0) / totalInventory * 100) : 0
+    },
+    { 
+      name: 'Reserved', 
+      value: stats?.motorcycles?.reserved || 0, 
+      color: '#EF4444',
+      percentage: totalInventory > 0 ? ((stats?.motorcycles?.reserved || 0) / totalInventory * 100) : 0
+    }
+  ].filter(item => item.value > 0); // Only show items with values > 0
 
-  const inventoryData = {
-    inStock: stats?.motorcycles?.inStock || 0,
-    sold: stats?.motorcycles?.sold || 0,
-    inRepair: stats?.motorcycles?.inRepair || 0,
-    inTransit: stats?.motorcycles?.inTransit || 0
-  };
+  // Create pie chart data for monthly revenue breakdown
+  const totalRevenue = (stats?.monthly?.revenue || 0) + (stats?.monthly?.repairExpenses || 0) + (stats?.monthly?.profit || 0);
+  
+  const revenuePieData = [
+    { 
+      name: 'Sales Revenue', 
+      value: stats?.monthly?.revenue || 0, 
+      color: '#10B981',
+      percentage: totalRevenue > 0 ? ((stats?.monthly?.revenue || 0) / totalRevenue * 100) : 0
+    },
+    { 
+      name: 'Repair Expenses', 
+      value: stats?.monthly?.repairExpenses || 0, 
+      color: '#EF4444',
+      percentage: totalRevenue > 0 ? ((stats?.monthly?.repairExpenses || 0) / totalRevenue * 100) : 0
+    },
+    { 
+      name: 'Net Profit', 
+      value: stats?.monthly?.profit || 0, 
+      color: '#3B82F6',
+      percentage: totalRevenue > 0 ? ((stats?.monthly?.profit || 0) / totalRevenue * 100) : 0
+    }
+  ].filter(item => item.value > 0); // Only show items with values > 0
+
+  console.log('AdminDashboard - inventoryPieData:', inventoryPieData);
+  console.log('AdminDashboard - revenuePieData:', revenuePieData);
 
   return (
     <>
@@ -625,6 +720,7 @@ const AdminDashboard = ({ stats, chartData }) => {
           subtitle={`${stats?.motorcycles?.inStock || 0} in stock`}
           trend="up"
           trendValue="+12%"
+          format="number"
         />
         <StatCard
           title="Monthly Sales"
@@ -634,30 +730,34 @@ const AdminDashboard = ({ stats, chartData }) => {
           subtitle="This month"
           trend="up"
           trendValue="+8%"
+          format="number"
         />
         <StatCard
           title="Monthly Revenue"
-          value={`TZS ${(stats?.monthly?.revenue || 0).toLocaleString('en-US')}`}
+          value={stats?.monthly?.revenue || 0}
           icon={FiDollarSign}
           color="success"
           subtitle="Revenue this month"
           trend="up"
           trendValue="+15%"
+          format="currency"
         />
         <StatCard
           title="Monthly Profit"
-          value={`TZS ${(stats?.monthly?.profit || 0).toLocaleString('en-US')}`}
+          value={stats?.monthly?.profit || 0}
           icon={FiTrendingUp}
           color="success"
           subtitle="Profit this month"
           trend="up"
           trendValue="+12%"
+          format="currency"
         />
         <StatCard
           title="Repair Expenses"
-          value={`TZS ${(stats?.monthly?.repairExpenses || 0).toLocaleString('en-US')}`}
+          value={stats?.monthly?.repairExpenses || 0}
           icon={FiTool}
           color="warning"
+          format="currency"
           subtitle="Expenses this month"
           trend="down"
           trendValue="-5%"
@@ -670,6 +770,7 @@ const AdminDashboard = ({ stats, chartData }) => {
           subtitle="Active customers"
           trend="up"
           trendValue="+3%"
+          format="number"
         />
         <StatCard
           title="Pending Transports"
@@ -677,19 +778,20 @@ const AdminDashboard = ({ stats, chartData }) => {
           icon={FiTruck}
           color="warning"
           subtitle="Awaiting delivery"
+          format="number"
         />
       </div>
 
-      {/* Charts and Analytics */}
+      {/* Pie Charts and Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
-        <ModernChart
-          data={salesChartData}
-          type="bar"
-          title="Monthly Sales Overview"
-          height={350}
-          colors={['#2563EB', '#10B981']}
-        />
-        <InventoryWidget data={inventoryData} />
+        <Card>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Motorcycle Inventory Distribution</h3>
+          <ResponsivePieChart data={inventoryPieData} height={300} />
+        </Card>
+        <Card>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Revenue Breakdown</h3>
+          <ResponsivePieChart data={revenuePieData} height={300} />
+        </Card>
       </div>
 
       {/* Recent Activity and Top Performers */}

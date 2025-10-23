@@ -101,119 +101,28 @@ const Contracts = () => {
     try {
       console.log('Fetching motorcycles, suppliers, and customers...');
       
-      // Fetch data individually to prevent one failure from breaking everything
-      let motorcyclesData = [];
-      let suppliersData = [];
-      let customersData = [];
+      const [bikesRes, suppliersRes, customersRes] = await Promise.all([
+        retryRequest(() => axios.get('/api/motorcycles', { timeout: 10000 })),
+        retryRequest(() => axios.get('/api/suppliers', { timeout: 10000 })),
+        retryRequest(() => axios.get('/api/customers', { timeout: 10000 }))
+      ]);
       
-      try {
-        console.log('Starting motorcycles API request...');
-        const bikesRes = await retryRequest(() => axios.get('/api/motorcycles', { timeout: 10000 }));
-        console.log('Motorcycles API response:', bikesRes);
-        console.log('Motorcycles response data:', bikesRes.data);
-        console.log('Motorcycles response data type:', typeof bikesRes.data);
-        console.log('Motorcycles response data is array:', Array.isArray(bikesRes.data));
-        console.log('Motorcycles response data length:', bikesRes.data?.length);
-        console.log('Motorcycles response data keys:', Object.keys(bikesRes.data || {}));
-        
-        // Handle different response structures
-        if (Array.isArray(bikesRes.data)) {
-          motorcyclesData = bikesRes.data;
-        } else if (bikesRes.data && typeof bikesRes.data === 'object') {
-          // If it's an object, check if it has a data property or is a wrapper
-          if (Array.isArray(bikesRes.data.data)) {
-            motorcyclesData = bikesRes.data.data;
-          } else if (Array.isArray(bikesRes.data.motorcycles)) {
-            motorcyclesData = bikesRes.data.motorcycles;
-          } else {
-            console.warn('Motorcycles response is object but no array found:', bikesRes.data);
-            motorcyclesData = [];
-          }
-        } else {
-          console.warn('Motorcycles response is not array or object:', bikesRes.data);
-          motorcyclesData = [];
-        }
-        
-        console.log('Motorcycles loaded:', motorcyclesData.length);
-        console.log('Motorcycles data:', motorcyclesData);
-        
-        // Additional validation
-        if (motorcyclesData.length === 0) {
-          console.warn('No motorcycles found in API response');
-        }
-      } catch (error) {
-        console.warn('Failed to load motorcycles:', error.message);
-        console.error('Motorcycles error details:', error);
-        console.error('Motorcycles error response:', error.response?.data);
-        motorcyclesData = [];
-      }
+      // Handle different response structures
+      const motorcyclesData = Array.isArray(bikesRes.data) ? bikesRes.data : [];
+      const suppliersData = Array.isArray(suppliersRes.data) ? suppliersRes.data : [];
+      const customersData = Array.isArray(customersRes.data) ? customersRes.data : [];
       
-      try {
-        console.log('Starting suppliers API request...');
-        const suppliersRes = await retryRequest(() => axios.get('/api/suppliers', { timeout: 10000 }));
-        console.log('Suppliers API response:', suppliersRes);
-        console.log('Suppliers response data:', suppliersRes.data);
-        console.log('Suppliers response data type:', typeof suppliersRes.data);
-        console.log('Suppliers response data is array:', Array.isArray(suppliersRes.data));
-        
-        suppliersData = Array.isArray(suppliersRes.data) ? suppliersRes.data : [];
-        console.log('Suppliers loaded:', suppliersData.length);
-        console.log('Suppliers data:', suppliersData);
-        
-        if (suppliersData.length === 0) {
-          console.warn('No suppliers found in API response');
-        }
-      } catch (error) {
-        console.warn('Failed to load suppliers:', error.message);
-        console.error('Suppliers error details:', error);
-        console.error('Suppliers error response:', error.response?.data);
-        suppliersData = [];
-      }
-      
-      try {
-        console.log('Starting customers API request...');
-        const customersRes = await retryRequest(() => axios.get('/api/customers', { timeout: 10000 }));
-        console.log('Customers API response:', customersRes);
-        console.log('Customers response data:', customersRes.data);
-        console.log('Customers response data type:', typeof customersRes.data);
-        console.log('Customers response data is array:', Array.isArray(customersRes.data));
-        
-        customersData = Array.isArray(customersRes.data) ? customersRes.data : [];
-        console.log('Customers loaded:', customersData.length);
-        console.log('Customers data:', customersData);
-        
-        if (customersData.length === 0) {
-          console.warn('No customers found in API response');
-        }
-      } catch (error) {
-        console.warn('Failed to load customers:', error.message);
-        console.error('Customers error details:', error);
-        console.error('Customers error response:', error.response?.data);
-        customersData = [];
-      }
-      
-      console.log('Data fetched successfully:', {
+      console.log('Data loaded successfully:', {
         motorcycles: motorcyclesData.length,
         suppliers: suppliersData.length,
         customers: customersData.length
       });
-      
-      // Debug: Log the actual data structure
-      console.log('Motorcycles data structure:', motorcyclesData);
-      console.log('Suppliers data structure:', suppliersData);
-      console.log('Customers data structure:', customersData);
-      
-      console.log('Setting state with data:');
-      console.log('Setting motorcycles:', motorcyclesData.length, 'items');
-      console.log('Setting suppliers:', suppliersData.length, 'items');
-      console.log('Setting customers:', customersData.length, 'items');
       
       setMotorcycles(motorcyclesData);
       setSuppliers(suppliersData);
       setCustomers(customersData);
       setError(null);
       
-      console.log('State set successfully');
     } catch (error) {
       console.error('Error fetching data:', error);
       setError('Failed to load required data. Some features may not work properly.');

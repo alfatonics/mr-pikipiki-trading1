@@ -57,14 +57,23 @@ const Repairs = () => {
 
   const fetchData = async () => {
     try {
+      console.log('Repairs: Fetching motorcycles and mechanics...');
+      
       const [bikesRes, mechanicsRes] = await Promise.all([
         axios.get('/api/motorcycles'),
         axios.get('/api/users/by-role/mechanic')
       ]);
-      setMotorcycles(bikesRes.data);
-      setMechanics(mechanicsRes.data);
+      
+      console.log('Repairs: Data loaded successfully');
+      console.log('Motorcycles:', bikesRes.data?.length || 0);
+      console.log('Mechanics:', mechanicsRes.data?.length || 0);
+      
+      setMotorcycles(bikesRes.data || []);
+      setMechanics(mechanicsRes.data || []);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Repairs: Error fetching data:', error);
+      setMotorcycles([]);
+      setMechanics([]);
     }
   };
 
@@ -467,20 +476,26 @@ const Repairs = () => {
               label="Motorcycle"
               value={formData.motorcycle}
               onChange={(e) => setFormData({ ...formData, motorcycle: e.target.value })}
-              options={motorcycles.map(m => ({ 
-                value: m._id, 
-                label: `${m.brand} ${m.model} - ${m.chassisNumber}` 
-              }))}
+              options={[
+                { value: '', label: 'Select a motorcycle...' },
+                ...(motorcycles || []).map(m => ({ 
+                  value: m._id, 
+                  label: `${m.brand} ${m.model} - ${m.chassisNumber}` 
+                }))
+              ]}
               required
             />
             <Select
               label="Assign to Mechanic"
               value={formData.mechanic}
               onChange={(e) => setFormData({ ...formData, mechanic: e.target.value })}
-              options={mechanics.map(m => ({ 
-                value: m._id, 
-                label: m.fullName 
-              }))}
+              options={[
+                { value: '', label: 'Select a mechanic...' },
+                ...(mechanics || []).map(m => ({ 
+                  value: m._id, 
+                  label: m.fullName 
+                }))
+              ]}
               required
             />
           </div>
