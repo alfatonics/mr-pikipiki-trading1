@@ -3,17 +3,19 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import authRoutes from '../server/routes/auth.js';
-import userRoutes from '../server/routes/users.js';
-import motorcycleRoutes from '../server/routes/motorcycles.js';
-import supplierRoutes from '../server/routes/suppliers.js';
-import customerRoutes from '../server/routes/customers.js';
-import contractRoutes from '../server/routes/contracts.js';
-import transportRoutes from '../server/routes/transport.js';
-import repairRoutes from '../server/routes/repairs.js';
-import reportRoutes from '../server/routes/reports.js';
-import dashboardRoutes from '../server/routes/dashboard.js';
-import approvalRoutes from '../server/routes/approvals.js';
+
+// Import routes
+import authRoutes from './routes/auth.js';
+import userRoutes from './routes/users.js';
+import motorcycleRoutes from './routes/motorcycles.js';
+import supplierRoutes from './routes/suppliers.js';
+import customerRoutes from './routes/customers.js';
+import contractRoutes from './routes/contracts.js';
+import transportRoutes from './routes/transport.js';
+import repairRoutes from './routes/repairs.js';
+import reportRoutes from './routes/reports.js';
+import dashboardRoutes from './routes/dashboard.js';
+import approvalRoutes from './routes/approvals.js';
 
 dotenv.config();
 
@@ -23,7 +25,6 @@ const app = express();
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://mr-pikipiki-trading-cpr5.vercel.app',
     'https://mr-pikipiki-trading.vercel.app',
     /\.vercel\.app$/,
     /^https:\/\/.*\.vercel\.app$/
@@ -47,6 +48,7 @@ app.use(cors({
   preflightContinue: false,
   maxAge: 86400
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -97,7 +99,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'MR PIKIPIKI TRADING API is running' });
 });
 
-// Test endpoint to verify database connection and user
+// Test endpoint to verify database connection
 app.get('/api/test-db', async (req, res) => {
   try {
     const User = mongoose.model('User');
@@ -124,4 +126,3 @@ app.use((err, req, res, next) => {
 });
 
 export default app;
-

@@ -1,8 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "npm install && npm run build",
-  "outputDirectory": "client/dist",
-  "installCommand": "npm install",
   "builds": [
     {
       "src": "client/package.json",
@@ -12,34 +9,18 @@
       }
     },
     {
-      "src": "api/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 30
-      }
+      "src": "server/vercel.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.js"
+      "dest": "/server/vercel.js"
     },
     {
       "src": "/(.*)",
       "dest": "/client/dist/index.html"
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/client/dist/index.html"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
