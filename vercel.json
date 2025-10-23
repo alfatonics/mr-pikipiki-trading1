@@ -29,6 +29,16 @@
       "dest": "/client/dist/index.html"
     }
   ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/client/dist/index.html"
+    }
+  ],
   "env": {
     "NODE_ENV": "production"
   }
