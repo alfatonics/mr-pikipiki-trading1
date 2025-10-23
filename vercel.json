@@ -28,11 +28,5 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  },
-  "rewrites": [
-    {
-      "source": "/((?!api).*)",
-      "destination": "/client/dist/index.html"
-    }
-  ]
+  }
 }
