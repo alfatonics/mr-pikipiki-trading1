@@ -1,8 +1,21 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-// Configure axios defaults
-axios.defaults.baseURL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000';
+// Configure axios defaults with mobile-friendly settings
+const getBaseURL = () => {
+  if (process.env.NODE_ENV === 'production') {
+    // In production, use relative URLs for same-origin requests
+    return '';
+  } else {
+    // In development, use localhost
+    return 'http://localhost:5000';
+  }
+};
+
+axios.defaults.baseURL = getBaseURL();
+axios.defaults.timeout = 30000; // 30 second timeout for mobile
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+axios.defaults.headers.common['Accept'] = 'application/json';
 
 // JWT token utilities
 const isTokenValid = (token) => {
@@ -176,30 +189,54 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      console.log('=== LOGIN ATTEMPT START ===');
+      console.log('=== MOBILE LOGIN ATTEMPT START ===');
       console.log('Username:', username);
       console.log('User Agent:', navigator.userAgent);
       console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
       console.log('Base URL:', axios.defaults.baseURL);
       console.log('Current URL:', window.location.href);
+      console.log('Network Status:', navigator.onLine);
+      console.log('Environment:', process.env.NODE_ENV);
       setIsLoading(true);
       
-      // Mobile browsers may need longer timeout
+      // Enhanced mobile detection and timeout
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const timeout = isMobile ? 30000 : 10000; // 30 seconds for mobile, 10 for desktop
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      
+      console.log('Device Detection:', { isMobile, isIOS, isAndroid });
+      
+      // Mobile-specific timeout and retry logic
+      const timeout = isMobile ? 45000 : 15000; // 45 seconds for mobile, 15 for desktop
       
       console.log('Making login request with timeout:', timeout);
-      const response = await axios.post('/api/auth/login', { username, password }, {
+      
+      // Enhanced request configuration for mobile
+      const requestConfig = {
         timeout: timeout,
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        // Mobile-specific axios config
+        maxRedirects: 5,
+        validateStatus: (status) => status < 500, // Accept 4xx errors for proper error handling
+      };
+      
+      // Add mobile-specific headers
+      if (isMobile) {
+        requestConfig.headers['X-Requested-With'] = 'XMLHttpRequest';
+        requestConfig.headers['X-Mobile-Request'] = 'true';
+      }
+      
+      const response = await axios.post('/api/auth/login', { username, password }, requestConfig);
       
       console.log('Login response received:', {
         status: response.status,
         statusText: response.statusText,
+        headers: response.headers,
         data: response.data
       });
       
@@ -225,19 +262,44 @@ export const AuthProvider = ({ children }) => {
       console.log('Login process completed successfully');
       return userData;
     } catch (error) {
-      console.error('=== LOGIN ERROR ===');
+      console.error('=== MOBILE LOGIN ERROR ===');
       console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
+      console.error('Error headers:', error.response?.headers);
       console.error('User Agent:', navigator.userAgent);
       console.error('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
       console.error('Network status:', navigator.onLine);
       console.error('Base URL:', axios.defaults.baseURL);
+      console.error('Current URL:', window.location.href);
+      console.error('Environment:', process.env.NODE_ENV);
+      
+      // Enhanced error handling for mobile
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again with a better connection.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Invalid username or password. Please check your credentials.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.response?.status === 0) {
+        errorMessage = 'Connection failed. Please check your internet connection.';
+      }
       
       // Clear any existing token on login failure
       localStorage.removeItem('token');
       setUser(null);
-      throw error;
+      
+      // Create enhanced error with mobile-specific message
+      const enhancedError = new Error(errorMessage);
+      enhancedError.originalError = error;
+      enhancedError.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      throw enhancedError;
     } finally {
       setIsLoading(false);
     }

@@ -25,16 +25,31 @@ const Login = () => {
       navigate('/');
     } catch (err) {
       console.error('Login form error:', err);
+      console.error('Error details:', {
+        message: err.message,
+        code: err.code,
+        response: err.response?.data,
+        status: err.response?.status,
+        isMobile: err.isMobile
+      });
+      
       let errorMessage = 'Login failed. Please try again.';
       
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.message?.includes('Network Error')) {
-        errorMessage = 'Network error. Please check your connection and try again.';
-      } else if (err.message?.includes('timeout')) {
-        errorMessage = 'Request timed out. Please try again.';
-      } else if (err.message) {
+      // Use the enhanced error message from AuthContext if available
+      if (err.message && err.message !== 'Login failed. Please try again.') {
         errorMessage = err.message;
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message?.includes('Network Error') || err.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (err.message?.includes('timeout') || err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again with a better connection.';
+      } else if (err.response?.status === 401) {
+        errorMessage = 'Invalid username or password. Please check your credentials.';
+      } else if (err.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (err.response?.status === 0) {
+        errorMessage = 'Connection failed. Please check your internet connection.';
       }
       
       setError(errorMessage);

@@ -24,11 +24,29 @@ app.use(cors({
     'http://localhost:3000',
     'https://mr-pikipiki-trading.vercel.app',
     'https://mr-pikipiki-trading-git-main-alfatonics.vercel.app',
-    /\.vercel\.app$/
+    /\.vercel\.app$/,
+    // Allow all Vercel preview deployments
+    /^https:\/\/.*\.vercel\.app$/
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'X-Mobile-Request',
+    'Cache-Control',
+    'Pragma',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Authorization'],
+  optionsSuccessStatus: 200,
+  preflightContinue: false,
+  // Mobile-specific CORS settings
+  maxAge: 86400 // 24 hours cache for preflight requests
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
