@@ -22,6 +22,8 @@ import Approvals from "./pages/Approvals";
 import MyRequests from "./pages/MyRequests";
 import MyJobs from "./pages/MyJobs";
 import Notifications from "./pages/Notifications";
+import DebugPage from "./pages/DebugPage";
+import Error404 from "./pages/Error404";
 import Layout from "./components/Layout";
 
 const PrivateRoute = ({ children }) => {
@@ -123,6 +125,9 @@ function App() {
                 }
               />
 
+              {/* Debug route - accessible without authentication */}
+              <Route path="/debug" element={<DebugPage />} />
+
               <Route
                 path="/"
                 element={
@@ -147,7 +152,7 @@ function App() {
               </Route>
 
               {/* Catch all route */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Error404 />} />
             </Routes>
           </Router>
         </NotificationProvider>
