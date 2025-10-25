@@ -34,88 +34,47 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       console.log('Fetching dashboard data...');
+      setLoading(true);
+      setError(null);
       
-      // Don't set fallback data immediately, let it load properly
+      console.log('Fetching dashboard stats...');
+      console.log('Axios baseURL:', axios.defaults.baseURL);
+      console.log('Making request to:', '/api/dashboard/stats');
       
-      // Try to fetch real data with shorter timeout
+      const statsRes = await axios.get('/api/dashboard/stats', { 
+        timeout: 10000 // Increased timeout
+      });
+      
+      console.log('API Response received:', statsRes.status);
+      console.log('Dashboard data fetched successfully');
+      console.log('Stats data:', statsRes.data);
+      
+      // Use the data directly from the API
+      setStats(statsRes.data);
+      setLoading(false);
+      
+      // Try to fetch chart data
       try {
-        console.log('Fetching dashboard stats...');
-        console.log('Axios baseURL:', axios.defaults.baseURL);
-        console.log('Making request to:', '/api/dashboard/stats');
-        
-        const statsRes = await axios.get('/api/dashboard/stats', { 
-          timeout: 3000 
+        const chartRes = await axios.get('/api/dashboard/charts/monthly-sales', { 
+          timeout: 5000 
         });
         
-        console.log('API Response received:', statsRes.status);
-      
-        console.log('Dashboard data fetched successfully');
-        console.log('Stats data:', statsRes.data);
-        console.log('Stats data type:', typeof statsRes.data);
-        console.log('Stats data keys:', Object.keys(statsRes.data || {}));
-        console.log('Response status:', statsRes.status);
-        console.log('Response headers:', statsRes.headers);
-        
-        // Update with real data - API already returns the correct structure
-        const statsData = statsRes.data;
-        console.log('Raw API data structure:', statsData);
-        
-        // The API already returns the data in the correct format, just use it directly
-        const formattedStats = {
-          motorcycles: statsData.motorcycles || { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
-          monthly: statsData.monthly || { sales: 0, revenue: 0, profit: 0, repairExpenses: 0 },
-          repairs: statsData.repairs || { total: 0, monthly: 0 },
-          totalCustomers: statsData.totalCustomers || 0,
-          pending: statsData.pending || { transports: 0, repairs: 0, approvals: 0 },
-          topSuppliers: statsData.topSuppliers || [],
-          recentSales: statsData.recentSales || []
-        };
-        
-        console.log('Setting formatted stats:', formattedStats);
-        console.log('Motorcycles total:', formattedStats.motorcycles.total);
-        console.log('Monthly sales:', formattedStats.monthly.sales);
-        console.log('Monthly revenue:', formattedStats.monthly.revenue);
-        console.log('Total customers:', formattedStats.totalCustomers);
-        setStats(formattedStats);
-        setLoading(false);
-        
-        // Try to fetch chart data
-        try {
-          const chartRes = await axios.get('/api/dashboard/charts/monthly-sales', { 
-            timeout: 3000 
-          });
-          
-          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          const formattedData = chartRes.data.map(item => ({
-            month: monthNames[item.month - 1],
-            sales: item.count,
-            revenue: item.revenue
-          }));
-          setChartData(formattedData);
-        } catch (chartError) {
-          console.log('Chart data fetch failed, using empty data');
-        }
-        
-      } catch (apiError) {
-        console.log('API fetch failed, using fallback data:', apiError.message);
-        // Set fallback data only if API fails
-        const fallbackStats = {
-          motorcycles: { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
-          monthly: { sales: 0, revenue: 0, profit: 0, repairExpenses: 0 },
-          repairs: { total: 0, monthly: 0 },
-          totalCustomers: 0,
-          pending: { transports: 0, repairs: 0, approvals: 0 },
-          topSuppliers: [],
-          recentSales: []
-        };
-        setStats(fallbackStats);
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const formattedData = chartRes.data.map(item => ({
+          month: monthNames[item.month - 1],
+          sales: item.count,
+          revenue: item.revenue
+        }));
+        setChartData(formattedData);
+      } catch (chartError) {
+        console.log('Chart data fetch failed, using empty data');
         setChartData([]);
-        setLoading(false);
       }
+      
     } catch (error) {
       console.error('Error in fetchDashboardData:', error);
       setLoading(false);
-      setError(null); // Don't show error, just use fallback data
+      setError('Failed to load dashboard data. Please check your connection and try again.');
     }
   };
 
@@ -130,7 +89,28 @@ const Dashboard = () => {
     );
   }
 
-  // Don't show error state, just use fallback data
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-6xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              fetchDashboardData();
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Role-based dashboard rendering
   const renderDashboard = () => {
@@ -149,32 +129,57 @@ const Dashboard = () => {
       );
     }
 
-    // Provide default stats if null
-    const defaultStats = {
-      motorcycles: { total: 0, inStock: 0, sold: 0, inRepair: 0, inTransit: 0 },
-      monthly: { sales: 0, revenue: 0 },
-      repairs: { monthly: 0 },
-      totalCustomers: 0,
-      pending: { transports: 0, approvals: 0, repairs: 0 },
-      topSuppliers: [],
-      recentSales: []
-    };
-
-    // If no stats after loading, show a message
+    // If no stats after loading, show a message with retry option
     if (!stats) {
       return (
         <div className="p-6">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-6 text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to MR PIKIPIKI TRADING</h1>
-            <p className="text-gray-600">No data available. Please check your connection.</p>
+            <p className="text-gray-600 mb-4">No data available. Please check your connection.</p>
+            <button 
+              onClick={() => {
+                setLoading(true);
+                fetchDashboardData();
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Retry Loading Data
+            </button>
           </div>
         </div>
       );
     }
-
-    // Use stats if available, otherwise use default
-    const safeStats = stats && Object.keys(stats).length > 0 ? stats : defaultStats;
     
+    // Ensure stats object has all required properties with defaults
+    const safeStats = {
+      motorcycles: {
+        total: stats?.motorcycles?.total || 0,
+        inStock: stats?.motorcycles?.inStock || 0,
+        sold: stats?.motorcycles?.sold || 0,
+        inRepair: stats?.motorcycles?.inRepair || 0,
+        inTransit: stats?.motorcycles?.inTransit || 0,
+        reserved: stats?.motorcycles?.reserved || 0
+      },
+      monthly: {
+        sales: stats?.monthly?.sales || 0,
+        revenue: stats?.monthly?.revenue || 0,
+        profit: stats?.monthly?.profit || 0,
+        repairExpenses: stats?.monthly?.repairExpenses || 0
+      },
+      repairs: {
+        total: stats?.repairs?.total || 0,
+        monthly: stats?.repairs?.monthly || 0
+      },
+      totalCustomers: stats?.totalCustomers || 0,
+      pending: {
+        transports: stats?.pending?.transports || 0,
+        repairs: stats?.pending?.repairs || 0,
+        approvals: stats?.pending?.approvals || 0
+      },
+      topSuppliers: stats?.topSuppliers || [],
+      recentSales: stats?.recentSales || []
+    };
+
     console.log('Dashboard render - stats:', stats);
     console.log('Dashboard render - safeStats:', safeStats);
     console.log('Dashboard render - motorcycles total:', safeStats.motorcycles?.total);
@@ -183,16 +188,6 @@ const Dashboard = () => {
     console.log('Dashboard render - user role:', user?.role);
     console.log('Dashboard render - loading:', loading);
     console.log('Dashboard render - error:', error);
-    
-    // Debug the data structure
-    if (stats) {
-      console.log('Stats structure:', {
-        motorcycles: stats.motorcycles,
-        monthly: stats.monthly,
-        totalCustomers: stats.totalCustomers,
-        pending: stats.pending
-      });
-    }
     
 
     switch (user?.role) {
@@ -707,9 +702,13 @@ const AdminDashboard = ({ stats, chartData }) => {
 
   console.log('AdminDashboard - inventoryPieData:', inventoryPieData);
   console.log('AdminDashboard - revenuePieData:', revenuePieData);
+  console.log('AdminDashboard - stats received:', stats);
+  console.log('AdminDashboard - motorcycles total:', stats?.motorcycles?.total);
+  console.log('AdminDashboard - monthly sales:', stats?.monthly?.sales);
 
   return (
     <>
+      
       {/* Key Metrics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
         <StatCard

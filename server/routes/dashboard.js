@@ -52,64 +52,96 @@ router.get('/stats', authenticate, async (req, res) => {
   try {
     console.log('Dashboard stats requested by user:', req.user.username);
     
-    // Motorcycle statistics - simplified approach
+    // Get REAL motorcycle statistics from database
     const totalMotorcycles = await Motorcycle.countDocuments();
     
-    // Get all motorcycles and count by status manually
-    const allMotorcycles = await Motorcycle.find({}, 'status');
+    // Get motorcycle counts by status using database aggregation
+    const motorcycleStats = await Motorcycle.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
     
-    // Count statuses manually
-    let inStock = 0, sold = 0, inRepair = 0, inTransit = 0, reserved = 0, nullStatus = 0;
+    // Initialize counters
+    let inStock = 0, sold = 0, inRepair = 0, inTransit = 0, reserved = 0;
     
-    allMotorcycles.forEach(motorcycle => {
-      const status = motorcycle.status;
+    // Process aggregation results
+    motorcycleStats.forEach(stat => {
+      const status = stat._id;
+      const count = stat.count;
+      
       if (!status || status === null || status === undefined) {
-        nullStatus++;
-        inStock++; // Treat null status as in stock
+        inStock += count; // Treat null status as in stock
       } else {
-        // Handle both database format ("In Stock") and expected format ("in_stock")
         const normalizedStatus = status.toLowerCase().replace(/\s+/g, '_');
         switch (normalizedStatus) {
           case 'in_stock':
-            inStock++;
+          case 'in stock':
+            inStock += count;
             break;
           case 'sold':
-            sold++;
+            sold += count;
             break;
           case 'in_repair':
-            inRepair++;
+          case 'in repair':
+            inRepair += count;
             break;
           case 'in_transit':
-            inTransit++;
+          case 'in transit':
+            inTransit += count;
             break;
           case 'reserved':
-            reserved++;
+            reserved += count;
             break;
           default:
-            inStock++; // Treat unknown status as in stock
+            inStock += count; // Treat unknown status as in stock
         }
       }
     });
     
-    console.log('Motorcycle counts:', { 
+    console.log('REAL Motorcycle counts from database:', { 
       total: totalMotorcycles, 
       inStock, 
       sold, 
       inRepair, 
       inTransit, 
-      reserved, 
-      nullStatus 
+      reserved
     });
     
-    // Monthly sales - add realistic sample data
+    // Get actual monthly sales data from database
     const currentMonth = new Date();
     currentMonth.setDate(1);
     currentMonth.setHours(0, 0, 0, 0);
+    const nextMonth = new Date(currentMonth);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
     
-    // Add realistic sample data for demonstration
-    const monthlySales = Math.max(3, Math.floor(totalMotorcycles * 0.2)); // At least 3 sales, or 20% of total
-    const monthlyRevenue = monthlySales * 2200000; // Average 2.2M TZS per bike
+    const monthlySalesData = await Motorcycle.aggregate([
+      {
+        $match: {
+          status: 'sold',
+          saleDate: {
+            $gte: currentMonth,
+            $lt: nextMonth
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          revenue: { $sum: '$sellingPrice' }
+        }
+      }
+    ]);
+    
+    const monthlySales = monthlySalesData.length > 0 ? monthlySalesData[0].count : 0;
+    const monthlyRevenue = monthlySalesData.length > 0 ? monthlySalesData[0].revenue : 0;
     const monthlyProfit = monthlyRevenue * 0.25; // 25% profit margin
+    
+    console.log('Monthly sales data:', { monthlySales, monthlyRevenue, monthlyProfit });
     
     // Top suppliers
     const topSuppliers = await Supplier.find({ isActive: true })
@@ -127,21 +159,47 @@ router.get('/stats', authenticate, async (req, res) => {
       status: { $in: ['pending', 'in_progress'] } 
     });
     
-    // Add realistic sample data for repairs and other metrics
-    const sampleRepairs = Math.max(2, Math.floor(totalMotorcycles * 0.15)); // At least 2 repairs, or 15% of total
-    const monthlyRepairExpenses = sampleRepairs * 550000; // 550K TZS per repair
-    const totalRepairExpenses = sampleRepairs * 750000; // 750K TZS total
+    // Get actual repair data from database
+    const repairStats = await Repair.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalRepairs: { $sum: 1 },
+          totalCost: { $sum: '$totalCost' },
+          monthlyCost: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$startDate', currentMonth] },
+                    { $lt: ['$startDate', nextMonth] }
+                  ]
+                },
+                '$totalCost',
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+    
+    const totalRepairs = repairStats.length > 0 ? repairStats[0].totalRepairs : 0;
+    const totalRepairExpenses = repairStats.length > 0 ? repairStats[0].totalCost : 0;
+    const monthlyRepairExpenses = repairStats.length > 0 ? repairStats[0].monthlyCost : 0;
+    
+    console.log('Repair stats:', { totalRepairs, totalRepairExpenses, monthlyRepairExpenses });
     const totalCustomers = await Customer.countDocuments();
     
-    // Add some sample pending transports
-    const sampleTransports = Math.max(1, Math.floor(totalMotorcycles * 0.1)); // At least 1 transport
-    
-    // Sample recent sales data
-    const recentSales = [
-      { brand: 'Bajaj', model: 'Pulsar 150', saleDate: new Date(), sellingPrice: 1800000, customer: { fullName: 'John Doe' } },
-      { brand: 'TVS', model: 'Apache 160', saleDate: new Date(), sellingPrice: 2200000, customer: { fullName: 'Jane Smith' } },
-      { brand: 'Honda', model: 'CBR 250', saleDate: new Date(), sellingPrice: 3500000, customer: { fullName: 'Mike Johnson' } }
-    ];
+    // Get actual recent sales data from database
+    const recentSales = await Motorcycle.find({ 
+      status: 'sold',
+      saleDate: { $exists: true }
+    })
+    .populate('customer', 'fullName')
+    .sort('-saleDate')
+    .limit(5)
+    .select('brand model saleDate sellingPrice customer');
     
     const response = {
       motorcycles: {
@@ -164,8 +222,8 @@ router.get('/stats', authenticate, async (req, res) => {
       },
       topSuppliers,
       pending: {
-        transports: sampleTransports,
-        repairs: sampleRepairs
+        transports: pendingTransports,
+        repairs: activeRepairs
       },
       totalCustomers,
       recentSales
