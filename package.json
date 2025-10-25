@@ -10,7 +10,8 @@
     "client": "cd client && npm run dev",
     "build": "cd client && npm install && npm run build",
     "vercel-build": "cd client && npm install && npm run build",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "postinstall": "cd client && npm install"
   },
   "keywords": [
     "motorcycle",
