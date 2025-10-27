@@ -82,41 +82,42 @@ router.get("/stats", authenticate, async (req, res) => {
     // Calculate monthly statistics (current month)
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     // Get sold motorcycles this month
     const allSoldMotorcycles = await Motorcycle.findAll({ status: "sold" });
-    const monthlySoldMotorcycles = allSoldMotorcycles.filter(m => {
+    const monthlySoldMotorcycles = allSoldMotorcycles.filter((m) => {
       if (m.saleDate) {
         const saleDate = new Date(m.saleDate);
         return saleDate >= firstDayOfMonth;
       }
       return false;
     });
-    
+
     const monthlySales = monthlySoldMotorcycles.length;
     const monthlyRevenue = monthlySoldMotorcycles.reduce((sum, m) => {
       return sum + (parseFloat(m.sellingPrice) || 0);
     }, 0);
-    
+
     const monthlyPurchaseCost = monthlySoldMotorcycles.reduce((sum, m) => {
       return sum + (parseFloat(m.purchasePrice) || 0);
     }, 0);
-    
+
     // Get repairs this month
     const allRepairs = await Repair.findAll();
-    const monthlyRepairs = allRepairs.filter(r => {
+    const monthlyRepairs = allRepairs.filter((r) => {
       if (r.createdAt) {
         const repairDate = new Date(r.createdAt);
         return repairDate >= firstDayOfMonth;
       }
       return false;
     });
-    
+
     const monthlyRepairExpenses = monthlyRepairs.reduce((sum, r) => {
       return sum + (parseFloat(r.cost) || 0);
     }, 0);
-    
-    const monthlyProfit = monthlyRevenue - monthlyPurchaseCost - monthlyRepairExpenses;
+
+    const monthlyProfit =
+      monthlyRevenue - monthlyPurchaseCost - monthlyRepairExpenses;
 
     const stats = {
       motorcycles: {
@@ -176,12 +177,10 @@ router.get("/stats", authenticate, async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error("Dashboard stats error:", error);
-    res
-      .status(500)
-      .json({
-        error: "Failed to fetch dashboard statistics",
-        details: error.message,
-      });
+    res.status(500).json({
+      error: "Failed to fetch dashboard statistics",
+      details: error.message,
+    });
   }
 });
 
@@ -222,18 +221,31 @@ router.get("/charts/monthly-sales", authenticate, async (req, res) => {
   try {
     // Get sold motorcycles from last 12 months
     const soldMotorcycles = await Motorcycle.findAll({ status: "sold" });
-    
+
     // Group by month
     const monthlyData = {};
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
     // Initialize all months with 0
-    months.forEach(month => {
+    months.forEach((month) => {
       monthlyData[month] = { month, sales: 0, revenue: 0 };
     });
-    
+
     // Populate with actual data
-    soldMotorcycles.forEach(motorcycle => {
+    soldMotorcycles.forEach((motorcycle) => {
       if (motorcycle.soldDate) {
         const date = new Date(motorcycle.soldDate);
         const month = months[date.getMonth()];
@@ -241,7 +253,7 @@ router.get("/charts/monthly-sales", authenticate, async (req, res) => {
         monthlyData[month].revenue += parseFloat(motorcycle.sellingPrice) || 0;
       }
     });
-    
+
     const chartData = Object.values(monthlyData);
     res.json(chartData);
   } catch (error) {
@@ -257,7 +269,7 @@ router.get("/charts/inventory-status", authenticate, async (req, res) => {
     const inRepair = await Motorcycle.count({ status: "in_repair" });
     const inTransit = await Motorcycle.count({ status: "in_transit" });
     const reserved = await Motorcycle.count({ status: "reserved" });
-    
+
     const chartData = [
       { name: "In Stock", value: inStock },
       { name: "Sold", value: sold },
@@ -265,7 +277,7 @@ router.get("/charts/inventory-status", authenticate, async (req, res) => {
       { name: "In Transit", value: inTransit },
       { name: "Reserved", value: reserved },
     ];
-    
+
     res.json(chartData);
   } catch (error) {
     console.error("Inventory status chart error:", error);
@@ -276,7 +288,7 @@ router.get("/charts/inventory-status", authenticate, async (req, res) => {
 router.get("/charts/top-suppliers", authenticate, async (req, res) => {
   try {
     const suppliers = await Supplier.findAll({ isActive: true });
-    
+
     // Get motorcycle count per supplier
     const supplierData = await Promise.all(
       suppliers.slice(0, 5).map(async (supplier) => {
@@ -288,7 +300,7 @@ router.get("/charts/top-suppliers", authenticate, async (req, res) => {
         };
       })
     );
-    
+
     res.json(supplierData);
   } catch (error) {
     console.error("Top suppliers chart error:", error);
@@ -299,16 +311,29 @@ router.get("/charts/top-suppliers", authenticate, async (req, res) => {
 router.get("/charts/repair-trends", authenticate, async (req, res) => {
   try {
     const repairs = await Repair.findAll();
-    
+
     // Group by month
     const monthlyData = {};
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    months.forEach(month => {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    months.forEach((month) => {
       monthlyData[month] = { month, count: 0, cost: 0 };
     });
-    
-    repairs.forEach(repair => {
+
+    repairs.forEach((repair) => {
       if (repair.createdAt) {
         const date = new Date(repair.createdAt);
         const month = months[date.getMonth()];
@@ -316,7 +341,7 @@ router.get("/charts/repair-trends", authenticate, async (req, res) => {
         monthlyData[month].cost += parseFloat(repair.cost) || 0;
       }
     });
-    
+
     const chartData = Object.values(monthlyData);
     res.json(chartData);
   } catch (error) {
