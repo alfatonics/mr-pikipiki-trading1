@@ -4,7 +4,8 @@ import app from './app.js';
 console.log('🚀 Vercel entry point loaded');
 console.log('📁 Current directory:', process.cwd());
 console.log('🌍 NODE_ENV:', process.env.NODE_ENV);
-console.log('🔗 MongoDB URI exists:', !!process.env.MONGODB_URI);
+console.log('🗄️ DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('🔐 DB_SSL enabled:', process.env.DB_SSL);
 console.log('🔑 JWT Secret exists:', !!process.env.JWT_SECRET);
 
 // Add request logging middleware
