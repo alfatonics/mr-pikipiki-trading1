@@ -79,6 +79,45 @@ router.get("/stats", authenticate, async (req, res) => {
     const recentMotorcycles = await Motorcycle.findAll();
     const recent = recentMotorcycles.slice(0, 5);
 
+    // Calculate monthly statistics (current month)
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // Get sold motorcycles this month
+    const allSoldMotorcycles = await Motorcycle.findAll({ status: "sold" });
+    const monthlySoldMotorcycles = allSoldMotorcycles.filter(m => {
+      if (m.saleDate) {
+        const saleDate = new Date(m.saleDate);
+        return saleDate >= firstDayOfMonth;
+      }
+      return false;
+    });
+    
+    const monthlySales = monthlySoldMotorcycles.length;
+    const monthlyRevenue = monthlySoldMotorcycles.reduce((sum, m) => {
+      return sum + (parseFloat(m.sellingPrice) || 0);
+    }, 0);
+    
+    const monthlyPurchaseCost = monthlySoldMotorcycles.reduce((sum, m) => {
+      return sum + (parseFloat(m.purchasePrice) || 0);
+    }, 0);
+    
+    // Get repairs this month
+    const allRepairs = await Repair.findAll();
+    const monthlyRepairs = allRepairs.filter(r => {
+      if (r.createdAt) {
+        const repairDate = new Date(r.createdAt);
+        return repairDate >= firstDayOfMonth;
+      }
+      return false;
+    });
+    
+    const monthlyRepairExpenses = monthlyRepairs.reduce((sum, r) => {
+      return sum + (parseFloat(r.cost) || 0);
+    }, 0);
+    
+    const monthlyProfit = monthlyRevenue - monthlyPurchaseCost - monthlyRepairExpenses;
+
     const stats = {
       motorcycles: {
         total: totalMotorcycles,
@@ -95,6 +134,12 @@ router.get("/stats", authenticate, async (req, res) => {
           { status: "reserved", count: reserved },
         ],
       },
+      monthly: {
+        sales: monthlySales,
+        revenue: monthlyRevenue,
+        profit: monthlyProfit,
+        repairExpenses: monthlyRepairExpenses,
+      },
       suppliers: {
         total: totalSuppliers,
         active: activeSuppliers,
@@ -102,6 +147,7 @@ router.get("/stats", authenticate, async (req, res) => {
       customers: {
         total: totalCustomers,
       },
+      totalCustomers,
       contracts: {
         total: totalContracts,
         active: activeContracts,
@@ -114,8 +160,16 @@ router.get("/stats", authenticate, async (req, res) => {
         total: totalRepairs,
         pending: pendingRepairs,
         inProgress: inProgressRepairs,
+        monthly: monthlyRepairs.length,
+      },
+      pending: {
+        transports: pendingTransports,
+        repairs: pendingRepairs,
+        approvals: 0, // TODO: Add approvals count
       },
       recentMotorcycles: recent,
+      topSuppliers: [], // TODO: Add top suppliers
+      recentSales: monthlySoldMotorcycles.slice(0, 5),
     };
 
     console.log("Dashboard stats compiled successfully");
