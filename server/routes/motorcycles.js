@@ -17,8 +17,22 @@ router.get("/", authenticate, async (req, res) => {
 
     const motorcycles = await Motorcycle.findAll(filter);
 
+    // Transform data to match frontend expectations
+    const transformed = motorcycles.map(m => ({
+      ...m,
+      _id: m.id, // Add _id for compatibility
+      supplier: m.supplierId ? {
+        _id: m.supplierId,
+        name: m.supplierName
+      } : null,
+      customer: m.customerId ? {
+        _id: m.customerId,
+        name: m.customerName
+      } : null
+    }));
+
     console.log(`Found ${motorcycles.length} motorcycles`);
-    res.json(motorcycles);
+    res.json(transformed);
   } catch (error) {
     console.error("Motorcycles API error:", error);
     res.status(500).json({ error: "Failed to fetch motorcycles" });
