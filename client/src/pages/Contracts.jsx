@@ -337,32 +337,43 @@ const Contracts = () => {
         return;
       }
 
-      // Create FormData for file upload
-      const formDataToSend = new FormData();
+      // Step 1: Create contract first
+      const contractPayload = {
+        ...formData,
+        motorcycleId: formData.motorcycle,
+        partyId: formData.party,
+        status: "active", // Contract is active since it's signed
+      };
+      
+      // Remove fields that need transformation
+      delete contractPayload.motorcycle;
+      delete contractPayload.party;
+      
+      const contractResponse = await axios.post("/api/contracts", contractPayload);
+      const createdContract = contractResponse.data;
 
-      // Add contract data
-      Object.keys(formData).forEach((key) => {
-        if (key === "installmentDetails") {
-          formDataToSend.append(key, JSON.stringify(formData[key]));
-        } else if (key === "warranties" || key === "penalties") {
-          formDataToSend.append(key, JSON.stringify(formData[key]));
-        } else {
-          formDataToSend.append(key, formData[key]);
+      // Step 2: Upload signed document if provided
+      if (signedDocument) {
+        const documentFormData = new FormData();
+        documentFormData.append("document", signedDocument);
+        documentFormData.append("documentType", "signed_contract");
+        documentFormData.append(
+          "description",
+          documentDescription || "Signed and stamped contract document"
+        );
+
+        try {
+          await axios.post(
+            `/api/contracts/${createdContract.id}/upload`,
+            documentFormData,
+            {
+              headers: { "Content-Type": "multipart/form-data" },
+            }
+          );
+        } catch (uploadError) {
+          console.log("Note: Document upload failed, but contract was created");
         }
-      });
-
-      // Add document
-      formDataToSend.append("document", signedDocument);
-      formDataToSend.append("documentType", "signed_contract");
-      formDataToSend.append(
-        "description",
-        documentDescription || "Signed and stamped contract document"
-      );
-      formDataToSend.append("status", "active"); // Contract is active since it's signed
-
-      await axios.post("/api/contracts/with-document", formDataToSend, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      }
 
       setModalOpen(false);
       setFormData({
@@ -699,7 +710,7 @@ const Contracts = () => {
               options={[
                 { value: "", label: "Select a motorcycle..." },
                 ...motorcycles.map((bike) => ({
-                  value: bike._id,
+                  value: bike.id || bike._id,
                   label: `${bike.brand} ${bike.model} - ${bike.chassisNumber}`,
                 })),
               ]}
@@ -715,11 +726,11 @@ const Contracts = () => {
               options={[
                 { value: "", label: "Select a party..." },
                 ...suppliers.map((supplier) => ({
-                  value: supplier._id,
+                  value: supplier.id || supplier._id,
                   label: `Supplier: ${supplier.name}`,
                 })),
                 ...customers.map((customer) => ({
-                  value: customer._id,
+                  value: customer.id || customer._id,
                   label: `Customer: ${customer.fullName}`,
                 })),
               ]}
