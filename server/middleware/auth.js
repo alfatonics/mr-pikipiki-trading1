@@ -29,8 +29,16 @@ export const authorize = (...roles) => {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    if (!roles.includes(req.user.role) && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Insufficient permissions" });
+    // Case-insensitive role comparison
+    const userRole = req.user.role.toLowerCase();
+    const allowedRoles = roles.map(r => r.toLowerCase());
+    
+    if (!allowedRoles.includes(userRole) && userRole !== "admin") {
+      return res.status(403).json({ 
+        error: "Insufficient permissions",
+        userRole: req.user.role,
+        requiredRoles: roles
+      });
     }
 
     next();
