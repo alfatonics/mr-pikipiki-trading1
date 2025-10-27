@@ -2,15 +2,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
+      "src": "package.json",
+      "use": "@vercel/node",
       "config": {
-        "distDir": "dist"
+        "includeFiles": ["client/dist/**"]
       }
-    },
-    {
-      "src": "server/vercel.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -19,8 +15,18 @@
       "dest": "/server/vercel.js"
     },
     {
-      "src": "/(.*)",
+      "src": "/",
       "dest": "/client/dist/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/client/dist/$1"
     }
-  ]
+  ],
+  "functions": {
+    "server/vercel.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
 }
