@@ -31,13 +31,13 @@ export const authorize = (...roles) => {
 
     // Case-insensitive role comparison
     const userRole = req.user.role.toLowerCase();
-    const allowedRoles = roles.map(r => r.toLowerCase());
-    
+    const allowedRoles = roles.map((r) => r.toLowerCase());
+
     if (!allowedRoles.includes(userRole) && userRole !== "admin") {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: "Insufficient permissions",
         userRole: req.user.role,
-        requiredRoles: roles
+        requiredRoles: roles,
       });
     }
 
