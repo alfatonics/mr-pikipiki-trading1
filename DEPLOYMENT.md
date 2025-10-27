@@ -3,6 +3,7 @@
 Mwongozo kamili wa kuhost application yako kwenye Vercel.
 
 ## 📋 Table of Contents
+
 1. [Pre-requisites](#pre-requisites)
 2. [Database Setup (Neon PostgreSQL)](#database-setup)
 3. [Environment Variables](#environment-variables)
@@ -15,6 +16,7 @@ Mwongozo kamili wa kuhost application yako kwenye Vercel.
 ## 🔧 Pre-requisites
 
 Kabla ya kudeploy, hakikisha una:
+
 - ✅ Account ya GitHub (tayari una!)
 - ✅ Account ya Vercel ([vercel.com](https://vercel.com))
 - ✅ Account ya Neon Database ([neon.tech](https://neon.tech)) - **FREE!**
@@ -39,6 +41,7 @@ Kabla ya kudeploy, hakikisha una:
 Baada ya kutengeneza project:
 
 1. Utaona **Connection String** - inakaa hivi:
+
    ```
    postgresql://username:password@ep-xxx-xxx.region.aws.neon.tech/neondb?sslmode=require
    ```
@@ -70,13 +73,13 @@ Hizi ni environment variables **MUHIMU** kwa production:
 
 ### Required Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `NODE_ENV` | Environment mode | `production` |
+| Variable       | Description                            | Example                                          |
+| -------------- | -------------------------------------- | ------------------------------------------------ |
+| `NODE_ENV`     | Environment mode                       | `production`                                     |
 | `DATABASE_URL` | PostgreSQL connection string from Neon | `postgresql://user:pass@host/db?sslmode=require` |
-| `DB_SSL` | Enable SSL for database | `true` |
-| `JWT_SECRET` | Secret key for JWT tokens | Use a strong random string |
-| `PORT` | Server port (Vercel auto-assigns) | `5000` |
+| `DB_SSL`       | Enable SSL for database                | `true`                                           |
+| `JWT_SECRET`   | Secret key for JWT tokens              | Use a strong random string                       |
+| `PORT`         | Server port (Vercel auto-assigns)      | `5000`                                           |
 
 ### Generate JWT Secret
 
@@ -94,6 +97,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
 **Example output:**
+
 ```
 Xy7pK3nM9vQ2wR5tU8yA1bN4cZ6dE0fG==
 ```
@@ -135,6 +139,7 @@ PORT=5000
 ```
 
 **How to add:**
+
 1. Name: `NODE_ENV` → Value: `production` → Click "Add"
 2. Name: `DATABASE_URL` → Value: Your Neon connection string → Click "Add"
 3. Name: `DB_SSL` → Value: `true` → Click "Add"
@@ -173,6 +178,7 @@ vercel --prod
 Kama database yako ni tupu, lazima u-setup schema na data:
 
 **Using Neon SQL Editor:**
+
 1. Open Neon dashboard → Your Project → SQL Editor
 2. Copy & paste contents from `server/database/schema.sql`
 3. Click "Run"
@@ -198,15 +204,19 @@ curl -X POST https://your-app.vercel.app/api/auth/register \
 ### 3. Test Your Deployment
 
 1. **Health Check:**
+
    ```
    https://your-app.vercel.app/api/health
    ```
+
    Should return: `{"status":"ok","message":"MR PIKIPIKI TRADING API is running"}`
 
 2. **Database Check:**
+
    ```
    https://your-app.vercel.app/api/test-db
    ```
+
    Should show database connection info
 
 3. **Login to Frontend:**
@@ -222,6 +232,7 @@ curl -X POST https://your-app.vercel.app/api/auth/register \
 ### Problem: "Database connection failed"
 
 **Solution:**
+
 1. Check DATABASE_URL ni correct kwenye Vercel environment variables
 2. Hakikisha DB_SSL=true
 3. Verify Neon database iko active (inaenda sleep after inactivity on free plan)
@@ -234,6 +245,7 @@ curl https://your-app.vercel.app/api/test-db
 ### Problem: "Invalid token" / Authentication issues
 
 **Solution:**
+
 1. Hakikisha JWT_SECRET iko set kwenye Vercel
 2. Clear browser cache/localStorage
 3. Generate new JWT_SECRET na re-deploy
@@ -250,6 +262,7 @@ The CORS config in `server/app.js` already allows Vercel domains. If issues pers
 ### Problem: "Build failed"
 
 **Solution:**
+
 1. Check build logs kwenye Vercel dashboard
 2. Verify dependencies ziko correct kwenye package.json
 3. Ensure Node.js version ni compatible:
@@ -278,7 +291,7 @@ Kama una mobile app (iOS/Android) based on memory, update API URL:
 
 ```javascript
 // In your mobile app config
-const API_URL = 'https://your-app.vercel.app/api';
+const API_URL = "https://your-app.vercel.app/api";
 ```
 
 ---
@@ -301,11 +314,13 @@ git push origin main
 ## 📊 Monitoring
 
 ### Vercel Dashboard
+
 - **View logs:** Vercel Dashboard → Your Project → Functions
 - **Check analytics:** See request counts, response times
 - **Error tracking:** See function errors in real-time
 
 ### Database Monitoring
+
 - **Neon Dashboard:** Check connection count, query performance
 - **Set up alerts:** For high CPU or connection usage
 
@@ -315,10 +330,10 @@ git push origin main
 
 **FREE TIER LIMITS:**
 
-| Service | Free Tier | Enough For |
-|---------|-----------|------------|
-| **Vercel** | 100GB bandwidth/month, Unlimited deployments | ~10,000 page views |
-| **Neon** | 512 MB storage, 0.5 GB RAM | Small to medium business |
+| Service    | Free Tier                                    | Enough For               |
+| ---------- | -------------------------------------------- | ------------------------ |
+| **Vercel** | 100GB bandwidth/month, Unlimited deployments | ~10,000 page views       |
+| **Neon**   | 512 MB storage, 0.5 GB RAM                   | Small to medium business |
 
 **Total Cost:** **$0/month** for starter usage! 🎉
 
@@ -335,6 +350,7 @@ git push origin main
 ## ✉️ Support
 
 Kama una maswali:
+
 1. Check Vercel function logs
 2. Check Neon database logs
 3. Review this guide again
@@ -345,4 +361,3 @@ Kama una maswali:
 **🎉 Hongera! Your MR PIKIPIKI TRADING system is now LIVE on the internet!**
 
 Deployment URL: `https://your-app.vercel.app`
-
