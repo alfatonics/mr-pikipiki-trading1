@@ -321,7 +321,7 @@ const Motorcycles = () => {
               options={[
                 { value: "", label: "Select a supplier..." },
                 ...suppliers.map((s) => {
-                  return { value: s._id, label: s.name };
+                  return { value: s.id, label: s.name };
                 }),
               ]}
               required
