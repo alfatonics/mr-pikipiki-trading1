@@ -47,15 +47,26 @@ router.post(
   authorize("admin", "sales"),
   async (req, res) => {
     try {
+      console.log("Creating motorcycle:", req.body);
       const motorcycle = await Motorcycle.create(req.body);
+      console.log("Motorcycle created successfully:", motorcycle.id);
       const populated = await Motorcycle.findById(motorcycle.id);
       res.status(201).json(populated);
     } catch (error) {
+      console.error("Motorcycle creation error:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      
       if (error.code === "23505") {
         // PostgreSQL unique violation
         return res.status(400).json({ error: "Chassis number already exists" });
       }
-      res.status(500).json({ error: "Failed to create motorcycle" });
+      res.status(500).json({ 
+        error: "Failed to create motorcycle",
+        details: error.message,
+        code: error.code
+      });
     }
   }
 );
