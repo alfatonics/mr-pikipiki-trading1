@@ -93,7 +93,7 @@ const Motorcycles = () => {
       color: motorcycle.color,
       purchasePrice: motorcycle.purchasePrice,
       sellingPrice: motorcycle.sellingPrice || '',
-      supplier: motorcycle.supplier._id,
+      supplier: motorcycle.supplier?._id || '',
       purchaseDate: new Date(motorcycle.purchaseDate).toISOString().split('T')[0],
       status: motorcycle.status,
       registrationNumber: motorcycle.registrationNumber || '',
