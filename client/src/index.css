@@ -1,0 +1,209 @@
+/* Import modern fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Base font size adjustments for better mobile readability */
+html {
+  font-size: 12px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (min-width: 480px) {
+  html {
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceGentle {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Mobile-specific improvements */
+@layer utilities {
+  /* Improve touch targets for mobile */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better text rendering on mobile */
+  .text-rendering-optimized {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Prevent text size adjustment on orientation change */
+  .text-size-adjust-none {
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  /* Modern animations */
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-bounce-gentle {
+    animation: bounceGentle 0.6s ease-in-out;
+  }
+  
+  /* Gradient backgrounds */
+  .gradient-primary {
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  }
+  
+  .gradient-success {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  }
+  
+  .gradient-warning {
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  }
+  
+  .gradient-danger {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+  }
+  
+  /* Modern shadows */
+  .shadow-soft {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+  
+  .shadow-medium {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+  
+  .shadow-strong {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Hover effects */
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Glass morphism */
+  .glass {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  /* Dark mode utilities */
+  .dark .dark-bg {
+    background-color: #1F2937;
+  }
+  
+  .dark .dark-text {
+    color: #F9FAFB;
+  }
+  
+  .dark .dark-border {
+    border-color: #374151;
+  }
+}
+
+/* Improve button/clickable element sizes on mobile */
+@media (max-width: 640px) {
+  button, a, input[type="button"], input[type="submit"] {
+    min-height: 40px;
+  }
+  
+  /* Better spacing for mobile forms */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+}
+
+
