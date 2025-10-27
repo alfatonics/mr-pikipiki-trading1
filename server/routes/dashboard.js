@@ -163,4 +163,112 @@ router.get("/sales-summary", authenticate, async (req, res) => {
   }
 });
 
+// Chart endpoints
+router.get("/charts/monthly-sales", authenticate, async (req, res) => {
+  try {
+    // Get sold motorcycles from last 12 months
+    const soldMotorcycles = await Motorcycle.findAll({ status: "sold" });
+    
+    // Group by month
+    const monthlyData = {};
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Initialize all months with 0
+    months.forEach(month => {
+      monthlyData[month] = { month, sales: 0, revenue: 0 };
+    });
+    
+    // Populate with actual data
+    soldMotorcycles.forEach(motorcycle => {
+      if (motorcycle.soldDate) {
+        const date = new Date(motorcycle.soldDate);
+        const month = months[date.getMonth()];
+        monthlyData[month].sales += 1;
+        monthlyData[month].revenue += parseFloat(motorcycle.sellingPrice) || 0;
+      }
+    });
+    
+    const chartData = Object.values(monthlyData);
+    res.json(chartData);
+  } catch (error) {
+    console.error("Monthly sales chart error:", error);
+    res.status(500).json({ error: "Failed to fetch monthly sales data" });
+  }
+});
+
+router.get("/charts/inventory-status", authenticate, async (req, res) => {
+  try {
+    const inStock = await Motorcycle.count({ status: "in_stock" });
+    const sold = await Motorcycle.count({ status: "sold" });
+    const inRepair = await Motorcycle.count({ status: "in_repair" });
+    const inTransit = await Motorcycle.count({ status: "in_transit" });
+    const reserved = await Motorcycle.count({ status: "reserved" });
+    
+    const chartData = [
+      { name: "In Stock", value: inStock },
+      { name: "Sold", value: sold },
+      { name: "In Repair", value: inRepair },
+      { name: "In Transit", value: inTransit },
+      { name: "Reserved", value: reserved },
+    ];
+    
+    res.json(chartData);
+  } catch (error) {
+    console.error("Inventory status chart error:", error);
+    res.status(500).json({ error: "Failed to fetch inventory status data" });
+  }
+});
+
+router.get("/charts/top-suppliers", authenticate, async (req, res) => {
+  try {
+    const suppliers = await Supplier.findAll({ isActive: true });
+    
+    // Get motorcycle count per supplier
+    const supplierData = await Promise.all(
+      suppliers.slice(0, 5).map(async (supplier) => {
+        const count = await Motorcycle.count({ supplierId: supplier.id });
+        return {
+          name: supplier.name,
+          motorcycles: count,
+          rating: supplier.rating || 0,
+        };
+      })
+    );
+    
+    res.json(supplierData);
+  } catch (error) {
+    console.error("Top suppliers chart error:", error);
+    res.status(500).json({ error: "Failed to fetch top suppliers data" });
+  }
+});
+
+router.get("/charts/repair-trends", authenticate, async (req, res) => {
+  try {
+    const repairs = await Repair.findAll();
+    
+    // Group by month
+    const monthlyData = {};
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    months.forEach(month => {
+      monthlyData[month] = { month, count: 0, cost: 0 };
+    });
+    
+    repairs.forEach(repair => {
+      if (repair.createdAt) {
+        const date = new Date(repair.createdAt);
+        const month = months[date.getMonth()];
+        monthlyData[month].count += 1;
+        monthlyData[month].cost += parseFloat(repair.cost) || 0;
+      }
+    });
+    
+    const chartData = Object.values(monthlyData);
+    res.json(chartData);
+  } catch (error) {
+    console.error("Repair trends chart error:", error);
+    res.status(500).json({ error: "Failed to fetch repair trends data" });
+  }
+});
+
 export default router;
