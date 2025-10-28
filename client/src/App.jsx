@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
+import { AlertProvider } from "./context/AlertContext";
 import { useAuth } from "./context/AuthContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Login from "./pages/Login";
@@ -96,7 +97,8 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <NotificationProvider>
-          <Router>
+          <AlertProvider>
+            <Router>
             <Routes>
               <Route
                 path="/login"
@@ -133,7 +135,8 @@ function App() {
               {/* Catch all route */}
               <Route path="*" element={<Error404 />} />
             </Routes>
-          </Router>
+            </Router>
+          </AlertProvider>
         </NotificationProvider>
       </AuthProvider>
     </ErrorBoundary>

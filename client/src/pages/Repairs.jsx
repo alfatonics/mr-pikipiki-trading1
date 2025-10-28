@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -14,6 +15,7 @@ import {
 
 const Repairs = () => {
   const { user } = useAuth();
+  const { showSuccess, showError, showConfirm } = useAlert();
   const [repairs, setRepairs] = useState([]);
   const [motorcycles, setMotorcycles] = useState([]);
   const [mechanics, setMechanics] = useState([]);
@@ -88,50 +90,59 @@ const Repairs = () => {
     
     // Client-side validation
     if (!formData.motorcycle) {
-      alert('Please select a motorcycle');
+      showError('Please select a motorcycle');
       return;
     }
     
     if (!formData.mechanic) {
-      alert('Please select a mechanic to assign this repair');
+      showError('Please select a mechanic to assign this repair');
       return;
     }
     
     if (!formData.description || formData.description.trim() === '') {
-      alert('Please provide a repair description');
+      showError('Please provide a repair description');
       return;
     }
     
     try {
+      // Transform formData to match backend expectations
+      const repairData = {
+        motorcycleId: formData.motorcycle,
+        mechanicId: formData.mechanic,
+        description: formData.description,
+        repairType: formData.repairType,
+        startDate: formData.startDate,
+        notes: formData.notes
+      };
       
       if (editingRepair) {
         // Update repair assignment (no costs involved)
-        const response = await axios.put(`/api/repairs/${editingRepair._id}`, formData);
-        alert('Repair assignment updated successfully!');
+        const response = await axios.put(`/api/repairs/${editingRepair.id || editingRepair._id}`, repairData);
+        showSuccess('Repair assignment updated successfully!');
       } else {
         // Create new repair assignment (NO costs - just assignment)
-        const response = await axios.post('/api/repairs', formData);
-        alert('Repair assigned successfully!\n\nMechanic can now work on it and register details.');
+        const response = await axios.post('/api/repairs', repairData);
+        showSuccess('Repair assigned successfully! Mechanic can now work on it and register details.');
       }
       
       fetchRepairs();
       handleCloseModal();
     } catch (error) {
       const errorMessage = error.response?.data?.error || error.message || 'Failed to save repair';
-      alert(`Error: ${errorMessage}`);
+      showError(`Error: ${errorMessage}`);
     }
   };
 
   const handleStartWork = async (repairId) => {
-    if (window.confirm('Start working on this repair?')) {
+    showConfirm('Start working on this repair?', async () => {
       try {
         await axios.post(`/api/repairs/${repairId}/start-work`);
         fetchRepairs();
-        alert('Repair status changed to In Progress. You can now start working!');
+        showSuccess('Repair status changed to In Progress. You can now start working!');
       } catch (error) {
-        alert('Failed to start repair: ' + (error.response?.data?.error || error.message));
+        showError('Failed to start repair: ' + (error.response?.data?.error || error.message));
       }
-    }
+    });
   };
 
   const handleRegisterDetails = (repair) => {
@@ -151,36 +162,36 @@ const Repairs = () => {
     e.preventDefault();
     
     if (!detailsData.workDescription || detailsData.workDescription.trim() === '') {
-      alert('Please provide a work description');
+      showError('Please provide a work description');
       return;
     }
     
     if (parseFloat(detailsData.laborCost) <= 0) {
-      alert('Please enter labor cost');
+      showError('Please enter labor cost');
       return;
     }
     
     try {
-      const response = await axios.post(`/api/repairs/${selectedRepair._id}/register-details`, detailsData);
+      const response = await axios.post(`/api/repairs/${selectedRepair.id || selectedRepair._id}/register-details`, detailsData);
       
       fetchRepairs();
       setDetailsModalOpen(false);
-      alert('Repair details submitted for approval!\n\nYour repair costs will be reviewed by Sales → Admin');
+      showSuccess('Repair details submitted for approval! Your repair costs will be reviewed by Sales → Admin');
     } catch (error) {
-      alert('Failed to submit details: ' + (error.response?.data?.error || error.message));
+      showError('Failed to submit details: ' + (error.response?.data?.error || error.message));
     }
   };
 
   const handleMarkComplete = async (repairId) => {
-    if (window.confirm('Mark this repair as completed?\n\nThe motorcycle will be returned to stock.')) {
+    showConfirm('Mark this repair as completed? The motorcycle will be returned to stock.', async () => {
       try {
         await axios.post(`/api/repairs/${repairId}/complete`);
         fetchRepairs();
-        alert('Repair marked as completed! Motorcycle is now back in stock.');
+        showSuccess('Repair marked as completed! Motorcycle is now back in stock.');
       } catch (error) {
-        alert('Failed to complete repair: ' + (error.response?.data?.error || error.message));
+        showError('Failed to complete repair: ' + (error.response?.data?.error || error.message));
       }
-    }
+    });
   };
 
   const handleStatusChange = async (repairId, newStatus) => {
@@ -191,7 +202,7 @@ const Repairs = () => {
       cancelled: 'Cancelled'
     };
 
-    if (window.confirm(`Change repair status to "${statusLabels[newStatus]}"?`)) {
+    showConfirm(`Change repair status to "${statusLabels[newStatus]}"?`, async () => {
       try {
         if (newStatus === 'completed') {
           await axios.post(`/api/repairs/${repairId}/complete`);
@@ -199,18 +210,18 @@ const Repairs = () => {
           await axios.put(`/api/repairs/${repairId}`, { status: newStatus });
         }
         fetchRepairs();
-        alert(`Repair status changed to "${statusLabels[newStatus]}" successfully!`);
+        showSuccess(`Repair status changed to "${statusLabels[newStatus]}" successfully!`);
       } catch (error) {
-        alert('Failed to change repair status');
+        showError('Failed to change repair status');
       }
-    }
+    });
   };
 
   const handleEdit = (repair) => {
     setEditingRepair(repair);
     setFormData({
-      motorcycle: repair.motorcycle._id,
-      mechanic: repair.mechanic._id,
+      motorcycle: repair.motorcycleId || repair.motorcycle?._id || repair.motorcycle?.id,
+      mechanic: repair.mechanicId || repair.mechanic?._id || repair.mechanic?.id,
       description: repair.description,
       repairType: repair.repairType,
       startDate: new Date(repair.startDate).toISOString().split('T')[0],
@@ -268,11 +279,11 @@ const Repairs = () => {
   const columns = [
     { 
       header: 'Motorcycle', 
-      render: (row) => `${row.motorcycle?.brand} ${row.motorcycle?.model}` 
+      render: (row) => `${row.motorcycleBrand || 'N/A'} ${row.motorcycleModel || ''}`.trim() || row.motorcycleChassisNumber || 'N/A'
     },
     { 
       header: 'Mechanic', 
-      render: (row) => row.mechanic?.fullName || 'N/A'
+      render: (row) => row.mechanicName || 'N/A'
     },
     { 
       header: 'Type', 
@@ -303,7 +314,7 @@ const Repairs = () => {
           {/* Start Work button - for pending repairs */}
           {row.status === 'pending' && (user?.role === 'mechanic' || user?.role === 'admin') && (
             <button
-              onClick={() => handleStatusChange(row._id, 'in_progress')}
+            onClick={() => handleStatusChange(row.id || row._id, 'in_progress')}
               className="p-1 sm:p-0 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
               title="Start Work"
               aria-label="Start work on repair"
@@ -339,7 +350,7 @@ const Repairs = () => {
           {/* Mark Complete button - for details_approved repairs */}
           {row.status === 'details_approved' && (user?.role === 'mechanic' || user?.role === 'admin') && (
             <button
-              onClick={() => handleMarkComplete(row._id)}
+            onClick={() => handleMarkComplete(row.id || row._id)}
               className="p-1 sm:p-0 text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
               title="Mark as Completed"
               aria-label="Mark repair as completed"
@@ -351,7 +362,7 @@ const Repairs = () => {
           {/* Cancel button - for non-completed repairs */}
           {row.status !== 'completed' && row.status !== 'cancelled' && user?.role === 'admin' && (
             <button
-              onClick={() => handleStatusChange(row._id, 'cancelled')}
+            onClick={() => handleStatusChange(row.id || row._id, 'cancelled')}
               className="p-1 sm:p-0 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
               title="Cancel Repair"
               aria-label="Cancel repair"
@@ -466,7 +477,7 @@ const Repairs = () => {
               options={[
                 { value: '', label: 'Select a motorcycle...' },
                 ...(motorcycles || []).map(m => ({ 
-                  value: m._id, 
+                  value: m.id || m._id, 
                   label: `${m.brand} ${m.model} - ${m.chassisNumber}` 
                 }))
               ]}
@@ -479,7 +490,7 @@ const Repairs = () => {
               options={[
                 { value: '', label: 'Select a mechanic...' },
                 ...(mechanics || []).map(m => ({ 
-                  value: m._id, 
+                  value: m.id || m._id, 
                   label: m.fullName 
                 }))
               ]}

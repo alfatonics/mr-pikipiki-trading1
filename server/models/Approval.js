@@ -188,7 +188,11 @@ class Approval {
       UPDATE approvals
       SET ${fields.join(", ")}
       WHERE id = $${paramCount}
-      RETURNING id, status, updated_at as "updatedAt"
+      RETURNING id,
+                approval_type as "approvalType",
+                entity_id as "entityId",
+                status,
+                updated_at as "updatedAt"
     `;
 
     const result = await query(sql, values);

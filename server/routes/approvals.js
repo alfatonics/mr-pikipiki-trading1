@@ -36,6 +36,7 @@ router.get("/", authenticate, authorize("admin", "sales"), async (req, res) => {
     }
 
     const approvals = await Approval.findAll(filter);
+    // Optional: emit server-side events/webhooks if you later add real-time
     res.json(approvals);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch approvals" });
@@ -108,8 +109,18 @@ router.post(
         adminComments: req.body.comments,
       });
 
+      // If this is a repair completion approval, update the repair status
+      if (approval && approval.approvalType === 'repair_complete') {
+        const Repair = (await import('../models/Repair.js')).default;
+        await Repair.update(approval.entityId, { 
+          status: 'details_approved',
+          detailsApprovalId: approval.id 
+        });
+      }
+
       res.json(approval);
     } catch (error) {
+      console.error("Error approving admin:", error);
       res.status(500).json({ error: "Failed to approve" });
     }
   }

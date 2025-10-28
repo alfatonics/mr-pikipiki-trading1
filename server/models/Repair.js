@@ -59,6 +59,8 @@ class Repair {
     const sql = `
       SELECT r.*,
              m.chassis_number as "motorcycleChassisNumber",
+             m.brand as "motorcycleBrand",
+             m.model as "motorcycleModel",
              u.full_name as "mechanicName"
       FROM repairs r
       LEFT JOIN motorcycles m ON r.motorcycle_id = m.id
@@ -90,6 +92,8 @@ class Repair {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         motorcycleChassisNumber: row.motorcycleChassisNumber,
+        motorcycleBrand: row.motorcycleBrand,
+        motorcycleModel: row.motorcycleModel,
         mechanicName: row.mechanicName,
       };
     }
@@ -104,6 +108,8 @@ class Repair {
              r.labor_hours as "laborHours", r.total_cost as "totalCost",
              r.created_at as "createdAt", r.updated_at as "updatedAt",
              m.chassis_number as "motorcycleChassisNumber",
+             m.brand as "motorcycleBrand",
+             m.model as "motorcycleModel",
              u.full_name as "mechanicName"
       FROM repairs r
       LEFT JOIN motorcycles m ON r.motorcycle_id = m.id

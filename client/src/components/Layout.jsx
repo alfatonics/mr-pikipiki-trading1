@@ -33,7 +33,7 @@ const Layout = () => {
     { path: '/transport', icon: FiTruck, label: 'Transport', roles: ['admin', 'transport', 'sales'] },
     { path: '/repairs', icon: FiTool, label: 'Repairs', roles: ['admin', 'staff'] },
     { path: '/my-jobs', icon: FiTool, label: 'My Jobs', roles: ['mechanic'] },
-    { path: '/my-requests', icon: FiClock, label: 'My Requests', roles: ['sales', 'mechanic', 'transport', 'registration', 'secretary', 'staff'] },
+    { path: '/my-requests', icon: FiClock, label: 'My Requests', roles: ['sales', 'transport', 'registration', 'secretary', 'staff'] },
     { path: '/approvals', icon: FiCheckCircle, label: 'Approvals', roles: ['admin', 'sales'] },
     { path: '/reports', icon: FiBarChart2, label: 'Reports', roles: ['admin', 'sales'] },
     { path: '/notifications', icon: FiBell, label: 'Notifications', roles: ['all'] },

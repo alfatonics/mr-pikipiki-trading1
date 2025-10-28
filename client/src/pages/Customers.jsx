@@ -81,7 +81,13 @@ const Customers = () => {
       city: customer.city || 'Dar es Salaam',
       region: customer.region || '',
       occupation: customer.occupation || '',
-      notes: customer.notes || ''
+      notes: customer.notes || '',
+      // Sales/Pricing Information
+      budgetRange: customer.budgetRange || '',
+      preferredCurrency: customer.preferredCurrency || 'TZS',
+      creditLimit: customer.creditLimit || '',
+      paymentTerms: customer.paymentTerms || 'cash',
+      salesNotes: customer.salesNotes || ''
     });
     setModalOpen(true);
   };
@@ -99,7 +105,13 @@ const Customers = () => {
       city: 'Dar es Salaam',
       region: '',
       occupation: '',
-      notes: ''
+      notes: '',
+      // Sales/Pricing Information
+      budgetRange: '',
+      preferredCurrency: 'TZS',
+      creditLimit: '',
+      paymentTerms: 'cash',
+      salesNotes: ''
     });
   };
 

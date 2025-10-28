@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -12,6 +13,7 @@ import {
 
 const MyJobs = () => {
   const { user } = useAuth();
+  const { showSuccess, showError, showConfirm } = useAlert();
   const [myRepairs, setMyRepairs] = useState([]);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedRepair, setSelectedRepair] = useState(null);
@@ -30,6 +32,29 @@ const MyJobs = () => {
     fetchMyRepairs();
   }, [filter]);
 
+  // Auto-refresh on interval and when page regains focus/visibility
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchMyRepairs();
+    }, 10000); // 10 seconds
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchMyRepairs();
+      }
+    };
+    const handleFocus = () => fetchMyRepairs();
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [filter]);
+
   const fetchMyRepairs = async () => {
     try {
       const mechanicId = user._id || user.id;
@@ -42,6 +67,8 @@ const MyJobs = () => {
         );
       } else if (filter === 'awaiting') {
         filtered = response.data.filter(r => r.status === 'awaiting_details_approval');
+      } else if (filter === 'approved') {
+        filtered = response.data.filter(r => r.status === 'details_approved');
       } else if (filter === 'completed') {
         filtered = response.data.filter(r => r.status === 'completed');
       }
@@ -52,15 +79,15 @@ const MyJobs = () => {
   };
 
   const handleStartWork = async (repairId) => {
-    if (window.confirm('Start working on this repair?')) {
+    showConfirm('Start working on this repair?', async () => {
       try {
         await axios.put(`/api/repairs/${repairId}`, { status: 'in_progress' });
         fetchMyRepairs();
-        alert('Status changed to In Progress. You can now work on this repair!');
+        showSuccess('Status changed to In Progress. You can now work on this repair!');
       } catch (error) {
-        alert('Failed to start repair: ' + (error.response?.data?.error || error.message));
+        showError('Failed to start repair: ' + (error.response?.data?.error || error.message));
       }
-    }
+    });
   };
 
   const handleRegisterDetails = (repair) => {
@@ -80,41 +107,41 @@ const MyJobs = () => {
     e.preventDefault();
     
     if (!detailsData.workDescription || detailsData.workDescription.trim() === '') {
-      alert('Please provide a work description');
+      showError('Please provide a work description');
       return;
     }
     
     if (parseFloat(detailsData.laborCost) <= 0) {
-      alert('Please enter labor cost');
+      showError('Please enter labor cost');
       return;
     }
-
+    
     if (parseFloat(detailsData.laborHours) <= 0) {
-      alert('Please enter labor hours');
+      showError('Please enter labor hours');
       return;
     }
     
     try {
-      const response = await axios.post(`/api/repairs/${selectedRepair._id}/register-details`, detailsData);
+      const response = await axios.post(`/api/repairs/${selectedRepair.id || selectedRepair._id}/register-details`, detailsData);
       
       fetchMyRepairs();
       setDetailsModalOpen(false);
-      alert('Repair details submitted for approval!\n\nSales and Admin will review your costs.');
+      showSuccess('Repair details submitted for approval! Sales and Admin will review your costs.');
     } catch (error) {
-      alert('Failed to submit details: ' + (error.response?.data?.error || error.message));
+      showError('Failed to submit details: ' + (error.response?.data?.error || error.message));
     }
   };
 
   const handleMarkComplete = async (repairId) => {
-    if (window.confirm('Mark this repair as completed?\n\nThe motorcycle will be returned to stock.')) {
+    showConfirm('Mark this repair as completed? The motorcycle will be returned to stock.', async () => {
       try {
         await axios.post(`/api/repairs/${repairId}/complete`);
         fetchMyRepairs();
-        alert('Repair marked as completed! Motorcycle is now back in stock.');
+        showSuccess('Repair marked as completed! Motorcycle is now back in stock.');
       } catch (error) {
-        alert('Failed to complete repair: ' + (error.response?.data?.error || error.message));
+        showError('Failed to complete repair: ' + (error.response?.data?.error || error.message));
       }
-    }
+    });
   };
 
   const addSparePartRow = () => {
@@ -159,8 +186,8 @@ const MyJobs = () => {
       header: 'Motorcycle', 
       render: (row) => (
         <div>
-          <div className="font-medium">{row.motorcycle?.brand} {row.motorcycle?.model}</div>
-          <div className="text-xs text-gray-500">{row.motorcycle?.chassisNumber}</div>
+          <div className="font-medium">{row.motorcycleBrand || 'N/A'} {row.motorcycleModel || ''}</div>
+          <div className="text-xs text-gray-500">{row.motorcycleChassisNumber}</div>
         </div>
       )
     },
@@ -192,7 +219,7 @@ const MyJobs = () => {
           {/* Start Work - for pending */}
           {row.status === 'pending' && (
             <button
-              onClick={() => handleStartWork(row._id)}
+              onClick={() => handleStartWork(row.id || row._id)}
               className="text-orange-600 hover:text-orange-800"
               title="Start Work"
             >
@@ -225,7 +252,7 @@ const MyJobs = () => {
           {/* Mark Complete - for details_approved */}
           {row.status === 'details_approved' && (
             <button
-              onClick={() => handleMarkComplete(row._id)}
+              onClick={() => handleMarkComplete(row.id || row._id)}
               className="text-green-600 hover:text-green-800"
               title="Mark as Completed"
             >
@@ -289,6 +316,17 @@ const MyJobs = () => {
             Awaiting Approval
           </button>
           <button
+            onClick={() => setFilter('approved')}
+            className={`px-4 py-2 rounded-lg ${
+              filter === 'approved'
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            <FiCheckCircle className="inline mr-2" />
+            Approved
+          </button>
+          <button
             onClick={() => setFilter('completed')}
             className={`px-4 py-2 rounded-lg ${
               filter === 'completed'
@@ -321,6 +359,7 @@ const MyJobs = () => {
             <p className="text-gray-500 text-sm mt-2">
               {filter === 'active' ? 'You have no active repair jobs' :
                filter === 'awaiting' ? 'No repairs awaiting approval' :
+               filter === 'approved' ? 'No approved repairs waiting to complete' :
                filter === 'completed' ? 'No completed repairs yet' :
                'No repairs assigned to you yet'}
             </p>
@@ -329,7 +368,7 @@ const MyJobs = () => {
           <TableWithSearch 
             columns={columns} 
             data={myRepairs}
-            searchKeys={['description', 'motorcycle.brand', 'motorcycle.model', 'motorcycle.chassisNumber', 'repairType']}
+            searchKeys={['description', 'motorcycleBrand', 'motorcycleModel', 'motorcycleChassisNumber', 'repairType']}
           />
         )}
       </Card>
@@ -345,7 +384,7 @@ const MyJobs = () => {
           <div className="mb-4 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-semibold text-gray-900">Repair Information</h3>
             <p className="text-sm text-gray-700 mt-1">
-              <strong>Motorcycle:</strong> {selectedRepair.motorcycle?.brand} {selectedRepair.motorcycle?.model}
+              <strong>Motorcycle:</strong> {selectedRepair.motorcycleBrand || 'N/A'} {selectedRepair.motorcycleModel || ''}
             </p>
             <p className="text-sm text-gray-700">
               <strong>Assigned Task:</strong> {selectedRepair.description}

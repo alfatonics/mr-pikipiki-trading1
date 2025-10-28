@@ -107,11 +107,16 @@ const MyRequests = () => {
         nextStep: 'Admin will review and make the final decision.'
       };
     } else if (request.status === 'approved') {
+      const isRepair = request.approvalType === 'repair_complete';
       return {
         icon: <FiCheck className="text-green-600 text-2xl" />,
-        title: 'Approved & Completed',
-        description: 'Your request has been approved by both sales and admin.',
-        nextStep: 'The change has been executed in the system.'
+        title: isRepair ? 'Approved' : 'Approved',
+        description: isRepair
+          ? 'Your repair costs have been approved by Sales and Admin.'
+          : 'Your request has been approved by both sales and admin.',
+        nextStep: isRepair
+          ? 'Mechanic should now mark the repair as completed from My Jobs.'
+          : 'The change will be applied accordingly.'
       };
     } else if (request.status === 'rejected') {
       return {

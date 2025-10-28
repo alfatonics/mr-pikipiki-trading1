@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -9,6 +10,7 @@ import { FiCheck, FiX, FiEye, FiClock, FiAlertCircle } from 'react-icons/fi';
 
 const Approvals = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useAlert();
   const [approvals, setApprovals] = useState([]);
   const [filter, setFilter] = useState('pending');
   const [selectedApproval, setSelectedApproval] = useState(null);
@@ -54,38 +56,40 @@ const Approvals = () => {
 
   const handleApprove = async () => {
     try {
+      const approvalId = selectedApproval.id || selectedApproval._id;
       const endpoint = user.role === 'admin' 
-        ? `/api/approvals/${selectedApproval._id}/admin-approve`
-        : `/api/approvals/${selectedApproval._id}/sales-approve`;
+        ? `/api/approvals/${approvalId}/approve-admin`
+        : `/api/approvals/${approvalId}/approve-sales`;
       
       await axios.post(endpoint, { comments });
       
       fetchApprovals();
       setModalOpen(false);
-      alert(user.role === 'admin' 
-        ? 'Approved and executed successfully!' 
+      showSuccess(user.role === 'admin' 
+        ? 'Approved and executed successfully!'
         : 'Approved and forwarded to admin!');
     } catch (error) {
-      alert('Failed to approve: ' + (error.response?.data?.error || error.message));
+      showError('Failed to approve: ' + (error.response?.data?.error || error.message));
     }
   };
 
   const handleReject = async () => {
     if (!rejectionReason || rejectionReason.trim() === '') {
-      alert('Please provide a reason for rejection');
+      showError('Please provide a reason for rejection');
       return;
     }
 
     try {
-      await axios.post(`/api/approvals/${selectedApproval._id}/reject`, {
+      const approvalId = selectedApproval.id || selectedApproval._id;
+      await axios.post(`/api/approvals/${approvalId}/reject`, {
         reason: rejectionReason
       });
       
       fetchApprovals();
       setModalOpen(false);
-      alert('Request rejected successfully');
+      showSuccess('Request rejected successfully');
     } catch (error) {
-      alert('Failed to reject: ' + (error.response?.data?.error || error.message));
+      showError('Failed to reject: ' + (error.response?.data?.error || error.message));
     }
   };
 
