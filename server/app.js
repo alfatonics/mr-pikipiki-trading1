@@ -65,6 +65,15 @@ app.use(
     maxAge: 86400, // 24 hours cache for preflight requests
   })
 );
+// Add debug logging middleware BEFORE other middleware
+app.use((req, res, next) => {
+  console.log('🔍 Incoming request:', req.method, req.url);
+  console.log('📍 Original URL:', req.originalUrl);
+  console.log('📍 Path:', req.path);
+  console.log('📍 Base URL:', req.baseUrl);
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
