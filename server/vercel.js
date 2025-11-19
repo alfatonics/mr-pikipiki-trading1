@@ -4,14 +4,13 @@ import app from './app.js';
 console.log('🚀 Vercel entry point loaded');
 console.log('📁 Current directory:', process.cwd());
 console.log('🌍 NODE_ENV:', process.env.NODE_ENV);
-console.log('🔗 MongoDB URI exists:', !!process.env.MONGODB_URI);
 console.log('🔑 JWT Secret exists:', !!process.env.JWT_SECRET);
+console.log('💾 DATABASE_URL exists:', !!process.env.DATABASE_URL);
 
 // Add request logging middleware
 app.use((req, res, next) => {
   console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('📍 Request headers:', JSON.stringify(req.headers, null, 2));
-  console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
+  console.log('📍 Original URL:', req.originalUrl);
   next();
 });
 
@@ -19,9 +18,7 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   const originalSend = res.send;
   res.send = function(data) {
-    console.log(`📤 ${new Date().toISOString()} - Response for ${req.method} ${req.url}`);
-    console.log('📊 Response status:', res.statusCode);
-    console.log('📄 Response data:', typeof data === 'string' ? data.substring(0, 200) + '...' : data);
+    console.log(`📤 ${new Date().toISOString()} - Response for ${req.method} ${req.url} - Status: ${res.statusCode}`);
     return originalSend.call(this, data);
   };
   next();
@@ -34,6 +31,17 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Error handling middleware should be after all routes
+app.use((err, req, res, next) => {
+  console.error('🚨 Error:', err);
+  console.error('📍 Request URL:', req.url);
+  console.error('📍 Request method:', req.method);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 });
 
 export default app;

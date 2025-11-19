@@ -46,7 +46,12 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ Login error:", error);
+    console.error("📍 Error stack:", error.stack);
+    res.status(500).json({ 
+      error: "Server error",
+      message: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
   }
 });
 
