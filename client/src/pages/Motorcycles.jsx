@@ -13,23 +13,6 @@ const Motorcycles = () => {
   const { user } = useAuth();
   const [motorcycles, setMotorcycles] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  
-  // Debug suppliers state
-  console.log('Suppliers state:', suppliers);
-  console.log('Suppliers length:', suppliers.length);
-  console.log('User authentication:', user);
-  
-  // Manual test function
-  const testSuppliersAPI = async () => {
-    console.log('Manual test: Fetching suppliers...');
-    try {
-      const response = await axios.get('/api/suppliers');
-      console.log('Manual test - Suppliers response:', response.data);
-      console.log('Manual test - Suppliers count:', response.data.length);
-    } catch (error) {
-      console.error('Manual test - Error fetching suppliers:', error);
-    }
-  };
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMotorcycle, setEditingMotorcycle] = useState(null);
   const [formData, setFormData] = useState({
@@ -49,7 +32,6 @@ const Motorcycles = () => {
   });
 
   useEffect(() => {
-    console.log('Motorcycles useEffect - user:', user);
     if (user) {
       fetchMotorcycles();
       fetchSuppliers();
@@ -61,18 +43,15 @@ const Motorcycles = () => {
       const response = await axios.get('/api/motorcycles');
       setMotorcycles(response.data);
     } catch (error) {
-      console.error('Error fetching motorcycles:', error);
+      // Handle error silently or show user-friendly message
     }
   };
 
   const fetchSuppliers = async () => {
     try {
-      console.log('Fetching suppliers...');
       const response = await axios.get('/api/suppliers');
-      console.log('Suppliers loaded:', response.data?.length || 0);
       setSuppliers(response.data || []);
     } catch (error) {
-      console.error('Error fetching suppliers:', error);
       setSuppliers([]);
     }
   };
@@ -210,9 +189,6 @@ const Motorcycles = () => {
             <p className="text-gray-600">Manage motorcycle inventory and details</p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={testSuppliersAPI} variant="outline">
-              Test Suppliers API
-            </Button>
             <Button onClick={() => setModalOpen(true)}>
               <FiPlus className="inline mr-2" />
               Add Motorcycle
@@ -297,7 +273,6 @@ const Motorcycles = () => {
               options={[
                 { value: '', label: 'Select a supplier...' },
                 ...suppliers.map(s => {
-                  console.log('Supplier mapping:', { id: s._id, name: s.name });
                   return { value: s._id, label: s.name };
                 })
               ]}

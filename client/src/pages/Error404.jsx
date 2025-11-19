@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
 
 const Error404 = () => {
   return (
@@ -7,12 +7,14 @@ const Error404 = () => {
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
         <div className="mb-6">
           <div className="text-6xl mb-4">🚫</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">404 - Page Not Found</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            404 - Page Not Found
+          </h1>
           <p className="text-gray-600 mb-6">
             The page you're looking for doesn't exist or has been moved.
           </p>
         </div>
-        
+
         <div className="space-y-4">
           <Link
             to="/"
@@ -20,25 +22,13 @@ const Error404 = () => {
           >
             🏠 Go to Dashboard
           </Link>
-          
-          <Link
-            to="/debug"
-            className="block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-200"
-          >
-            🔍 Debug Information
-          </Link>
-          
+
           <button
             onClick={() => window.history.back()}
             className="block w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-200"
           >
             ⬅️ Go Back
           </button>
-        </div>
-        
-        <div className="mt-6 text-sm text-gray-500">
-          <p>Current URL: {window.location.href}</p>
-          <p>Timestamp: {new Date().toLocaleString()}</p>
         </div>
       </div>
     </div>

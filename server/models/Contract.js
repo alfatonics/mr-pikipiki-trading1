@@ -1,212 +1,218 @@
-import mongoose from 'mongoose';
+import { query } from "../config/database.js";
 
-const contractSchema = new mongoose.Schema({
-  // Contract Identification
-  contractNumber: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  type: {
-    type: String,
-    enum: ['purchase', 'sale', 'service', 'maintenance'],
-    required: true
-  },
-  
-  // Parties Information
-  motorcycle: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Motorcycle',
-    required: true
-  },
-  party: {
-    type: mongoose.Schema.Types.ObjectId,
-    refPath: 'partyModel',
-    required: true
-  },
-  partyModel: {
-    type: String,
-    enum: ['Supplier', 'Customer'],
-    required: true
-  },
-  
-  // Contract Details
-  amount: {
-    type: Number,
-    required: true
-  },
-  currency: {
-    type: String,
-    default: 'TZS',
-    enum: ['TZS', 'USD', 'EUR']
-  },
-  date: {
-    type: Date,
-    required: true,
-    default: Date.now
-  },
-  effectiveDate: {
-    type: Date,
-    required: true
-  },
-  expiryDate: {
-    type: Date
-  },
-  
-  // Payment Information
-  paymentMethod: {
-    type: String,
-    enum: ['cash', 'bank_transfer', 'mobile_money', 'installment', 'cheque'],
-    required: true
-  },
-  installmentDetails: {
-    downPayment: Number,
-    monthlyPayment: Number,
-    duration: Number, // in months
-    startDate: Date,
-    interestRate: Number,
-    totalAmount: Number
-  },
-  
-  // Legal Terms and Conditions
-  terms: {
-    type: String,
-    required: true
-  },
-  warranties: [{
-    description: String,
-    duration: Number, // in months
-    conditions: String
-  }],
-  penalties: [{
-    description: String,
-    amount: Number,
-    conditions: String
-  }],
-  
-  // Contract Status and Workflow
-  status: {
-    type: String,
-    enum: ['draft', 'pending_signature', 'active', 'completed', 'cancelled', 'breached'],
-    default: 'draft'
-  },
-  
-  // Signatures and Legal Compliance
-  signatures: {
-    partySignature: {
-      signed: { type: Boolean, default: false },
-      signedAt: Date,
-      signatureImage: String, // Base64 or file path
-      witnessName: String,
-      witnessSignature: String
-    },
-    companySignature: {
-      signed: { type: Boolean, default: false },
-      signedAt: Date,
-      signedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      signatureImage: String,
-      stampImage: String
-    }
-  },
-  
-  // Document Management
-  documents: [{
-    type: {
-      type: String,
-      enum: ['signed_contract', 'id_copy', 'receipt', 'warranty', 'other'],
-      required: true
-    },
-    filename: String,
-    originalName: String,
-    filePath: String,
-    uploadedAt: Date,
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    description: String
-  }],
-  
-  // Print and Physical Handling
-  printHistory: [{
-    printedAt: Date,
-    printedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    printCount: Number,
-    reason: String
-  }],
-  
-  // Legal and Compliance
-  legalCompliance: {
-    gdprCompliant: { type: Boolean, default: false },
-    dataRetentionPeriod: Number, // in years
-    courtAdmissible: { type: Boolean, default: true },
-    notarized: { type: Boolean, default: false },
-    notarizedAt: Date,
-    notaryName: String,
-    notaryStamp: String
-  },
-  
-  // Audit Trail
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  lastModifiedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  modificationHistory: [{
-    modifiedAt: Date,
-    modifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    changes: String,
-    reason: String
-  }],
-  
-  // Additional Information
-  notes: String,
-  internalNotes: String, // For internal use only
-  tags: [String],
-  priority: {
-    type: String,
-    enum: ['low', 'medium', 'high', 'urgent'],
-    default: 'medium'
+class Contract {
+  static async create(data) {
+    const {
+      contractNumber,
+      type,
+      motorcycleId,
+      partyId,
+      partyModel,
+      amount,
+      currency = "TZS",
+      date,
+      effectiveDate,
+      expiryDate,
+      paymentMethod,
+      terms,
+      status = "draft",
+      createdBy,
+      notes,
+      internalNotes,
+      priority = "medium",
+      // Installment details
+      installmentDownPayment,
+      installmentMonthlyPayment,
+      installmentDuration,
+      installmentStartDate,
+      installmentInterestRate,
+      installmentTotalAmount,
+    } = data;
+
+    const sql = `
+      INSERT INTO contracts (
+        contract_number, type, motorcycle_id, party_id, party_model, amount, currency,
+        date, effective_date, expiry_date, payment_method, terms, status, created_by,
+        notes, internal_notes, priority,
+        installment_down_payment, installment_monthly_payment, installment_duration,
+        installment_start_date, installment_interest_rate, installment_total_amount
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      RETURNING id, contract_number as "contractNumber", type, motorcycle_id as "motorcycleId",
+                party_id as "partyId", party_model as "partyModel", amount, currency,
+                date, effective_date as "effectiveDate", expiry_date as "expiryDate",
+                payment_method as "paymentMethod", terms, status, created_by as "createdBy",
+                notes, internal_notes as "internalNotes", priority,
+                created_at as "createdAt", updated_at as "updatedAt"
+    `;
+
+    const result = await query(sql, [
+      contractNumber,
+      type,
+      motorcycleId,
+      partyId,
+      partyModel,
+      amount,
+      currency,
+      date,
+      effectiveDate,
+      expiryDate,
+      paymentMethod,
+      terms,
+      status,
+      createdBy,
+      notes,
+      internalNotes,
+      priority,
+      installmentDownPayment,
+      installmentMonthlyPayment,
+      installmentDuration,
+      installmentStartDate,
+      installmentInterestRate,
+      installmentTotalAmount,
+    ]);
+    return result.rows[0];
   }
-}, {
-  timestamps: true
-});
 
-// Indexes for better performance
-contractSchema.index({ contractNumber: 1 });
-contractSchema.index({ status: 1 });
-contractSchema.index({ type: 1 });
-contractSchema.index({ 'signatures.partySignature.signed': 1 });
-contractSchema.index({ 'signatures.companySignature.signed': 1 });
-contractSchema.index({ createdAt: -1 });
+  static async findById(id) {
+    const sql = `
+      SELECT c.*, 
+             m.chassis_number as "motorcycleChassisNumber",
+             m.brand as "motorcycleBrand",
+             m.model as "motorcycleModel"
+      FROM contracts c
+      LEFT JOIN motorcycles m ON c.motorcycle_id = m.id
+      WHERE c.id = $1
+    `;
 
-// Virtual for contract age
-contractSchema.virtual('ageInDays').get(function() {
-  return Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24));
-});
+    const result = await query(sql, [id]);
+    if (result.rows[0]) {
+      // Convert snake_case to camelCase for the main contract fields
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        contractNumber: row.contract_number,
+        type: row.type,
+        motorcycleId: row.motorcycle_id,
+        partyId: row.party_id,
+        partyModel: row.party_model,
+        amount: row.amount,
+        currency: row.currency,
+        date: row.date,
+        effectiveDate: row.effective_date,
+        expiryDate: row.expiry_date,
+        paymentMethod: row.payment_method,
+        terms: row.terms,
+        status: row.status,
+        createdBy: row.created_by,
+        notes: row.notes,
+        internalNotes: row.internal_notes,
+        priority: row.priority,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        motorcycleChassisNumber: row.motorcycleChassisNumber,
+        motorcycleBrand: row.motorcycleBrand,
+        motorcycleModel: row.motorcycleModel,
+      };
+    }
+    return null;
+  }
 
-// Virtual for completion status
-contractSchema.virtual('isFullyExecuted').get(function() {
-  return this.signatures.partySignature.signed && this.signatures.companySignature.signed;
-});
+  static async findAll(filters = {}) {
+    let sql = `
+      SELECT c.id, c.contract_number as "contractNumber", c.type, c.motorcycle_id as "motorcycleId",
+             c.party_id as "partyId", c.party_model as "partyModel", c.amount, c.currency,
+             c.date, c.effective_date as "effectiveDate", c.expiry_date as "expiryDate",
+             c.payment_method as "paymentMethod", c.status, c.priority,
+             c.created_at as "createdAt", c.updated_at as "updatedAt",
+             m.chassis_number as "motorcycleChassisNumber",
+             m.brand as "motorcycleBrand",
+             m.model as "motorcycleModel"
+      FROM contracts c
+      LEFT JOIN motorcycles m ON c.motorcycle_id = m.id
+      WHERE 1=1
+    `;
 
-// Method to check if contract is legally binding
-contractSchema.methods.isLegallyBinding = function() {
-  return this.isFullyExecuted && this.status === 'active';
-};
+    const params = [];
+    let paramCount = 1;
 
-// Method to get contract summary
-contractSchema.methods.getSummary = function() {
-  return {
-    contractNumber: this.contractNumber,
-    type: this.type,
-    amount: this.amount,
-    currency: this.currency,
-    status: this.status,
-    isFullyExecuted: this.isFullyExecuted,
-    ageInDays: this.ageInDays
-  };
-};
+    if (filters.status) {
+      sql += ` AND c.status = $${paramCount}`;
+      params.push(filters.status);
+      paramCount++;
+    }
 
-export default mongoose.model('Contract', contractSchema);
+    if (filters.type) {
+      sql += ` AND c.type = $${paramCount}`;
+      params.push(filters.type);
+      paramCount++;
+    }
+
+    sql += " ORDER BY c.created_at DESC";
+
+    const result = await query(sql, params);
+    return result.rows;
+  }
+
+  static async update(id, updateData) {
+    const fields = [];
+    const values = [];
+    let paramCount = 1;
+
+    const fieldMap = {
+      status: "status",
+      terms: "terms",
+      notes: "notes",
+      internalNotes: "internal_notes",
+      priority: "priority",
+      amount: "amount",
+      expiryDate: "expiry_date",
+    };
+
+    for (const [jsKey, dbKey] of Object.entries(fieldMap)) {
+      if (updateData[jsKey] !== undefined) {
+        fields.push(`${dbKey} = $${paramCount}`);
+        values.push(updateData[jsKey]);
+        paramCount++;
+      }
+    }
+
+    if (fields.length === 0) {
+      throw new Error("No fields to update");
+    }
+
+    values.push(id);
+
+    const sql = `
+      UPDATE contracts
+      SET ${fields.join(", ")}
+      WHERE id = $${paramCount}
+      RETURNING id, contract_number as "contractNumber", type, status, created_at as "createdAt"
+    `;
+
+    const result = await query(sql, values);
+    return result.rows[0];
+  }
+
+  static async delete(id) {
+    const sql = "DELETE FROM contracts WHERE id = $1 RETURNING id";
+    const result = await query(sql, [id]);
+    return result.rows[0];
+  }
+
+  static async count(filters = {}) {
+    let sql = "SELECT COUNT(*) as count FROM contracts WHERE 1=1";
+    const params = [];
+    let paramCount = 1;
+
+    if (filters.status) {
+      sql += ` AND status = $${paramCount}`;
+      params.push(filters.status);
+    }
+
+    const result = await query(sql, params);
+    return parseInt(result.rows[0].count);
+  }
+}
+
+export default Contract;

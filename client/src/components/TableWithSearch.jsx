@@ -24,7 +24,6 @@ const TableWithSearch = ({ columns, data, onRowClick, searchKeys = [] }) => {
         try {
           return value.toString().toLowerCase().includes(searchTerm.toLowerCase());
         } catch (error) {
-          console.warn('Error filtering value:', value, error);
           return false;
         }
       });
@@ -177,7 +176,6 @@ const TableWithSearch = ({ columns, data, onRowClick, searchKeys = [] }) => {
                             }
                             return 'N/A';
                           } catch (error) {
-                            console.warn('Error rendering table cell:', error, { column, row });
                             return 'Error';
                           }
                         })()}

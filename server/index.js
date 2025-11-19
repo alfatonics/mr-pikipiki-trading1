@@ -1,18 +1,15 @@
-import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import app from './app.js';
+import dotenv from "dotenv";
+import app from "./app.js";
 
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 
-// Database connection for local development
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch((err) => console.error('❌ MongoDB connection error:', err));
+// PostgreSQL connection is handled via connection pool in app.js
+// No need for explicit connection here
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 API available at http://localhost:${PORT}/api`);
+  console.log(`📊 Database: PostgreSQL (Neon)`);
 });
-
-

@@ -36,7 +36,6 @@ const Reports = () => {
         link.remove();
       } else {
         // Display JSON data
-        console.log(response.data);
         alert('Report data logged to console');
       }
     } catch (error) {

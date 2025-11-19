@@ -40,7 +40,6 @@ const Customers = () => {
       const response = await axios.get('/api/customers');
       setCustomers(response.data);
     } catch (error) {
-      console.error('Error fetching customers:', error);
     }
   };
 

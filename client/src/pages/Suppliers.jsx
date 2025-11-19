@@ -33,7 +33,6 @@ const Suppliers = () => {
       const response = await axios.get('/api/suppliers');
       setSuppliers(response.data);
     } catch (error) {
-      console.error('Error fetching suppliers:', error);
     }
   };
 

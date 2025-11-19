@@ -33,7 +33,6 @@ const MyRequests = () => {
       const response = await axios.get('/api/approvals/my-requests', { params });
       setRequests(response.data);
     } catch (error) {
-      console.error('Error fetching my requests:', error);
     }
   };
 

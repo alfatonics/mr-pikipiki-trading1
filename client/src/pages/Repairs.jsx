@@ -51,27 +51,21 @@ const Repairs = () => {
       const response = await axios.get('/api/repairs');
       setRepairs(response.data);
     } catch (error) {
-      console.error('Error fetching repairs:', error);
     }
   };
 
   const fetchData = async () => {
     try {
-      console.log('Repairs: Fetching motorcycles and mechanics...');
       
       const [bikesRes, mechanicsRes] = await Promise.all([
         axios.get('/api/motorcycles'),
         axios.get('/api/users/by-role/mechanic')
       ]);
       
-      console.log('Repairs: Data loaded successfully');
-      console.log('Motorcycles:', bikesRes.data?.length || 0);
-      console.log('Mechanics:', mechanicsRes.data?.length || 0);
       
       setMotorcycles(bikesRes.data || []);
       setMechanics(mechanicsRes.data || []);
     } catch (error) {
-      console.error('Repairs: Error fetching data:', error);
       setMotorcycles([]);
       setMechanics([]);
     }
@@ -109,24 +103,20 @@ const Repairs = () => {
     }
     
     try {
-      console.log('Submitting repair assignment:', formData);
       
       if (editingRepair) {
         // Update repair assignment (no costs involved)
         const response = await axios.put(`/api/repairs/${editingRepair._id}`, formData);
-        console.log('Repair updated successfully:', response.data);
         alert('Repair assignment updated successfully!');
       } else {
         // Create new repair assignment (NO costs - just assignment)
         const response = await axios.post('/api/repairs', formData);
-        console.log('Repair created successfully:', response.data);
         alert('Repair assigned successfully!\n\nMechanic can now work on it and register details.');
       }
       
       fetchRepairs();
       handleCloseModal();
     } catch (error) {
-      console.error('Error saving repair:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to save repair';
       alert(`Error: ${errorMessage}`);
     }
@@ -172,13 +162,11 @@ const Repairs = () => {
     
     try {
       const response = await axios.post(`/api/repairs/${selectedRepair._id}/register-details`, detailsData);
-      console.log('Repair details submitted:', response.data);
       
       fetchRepairs();
       setDetailsModalOpen(false);
       alert('Repair details submitted for approval!\n\nYour repair costs will be reviewed by Sales → Admin');
     } catch (error) {
-      console.error('Error submitting details:', error);
       alert('Failed to submit details: ' + (error.response?.data?.error || error.message));
     }
   };
@@ -213,7 +201,6 @@ const Repairs = () => {
         fetchRepairs();
         alert(`Repair status changed to "${statusLabels[newStatus]}" successfully!`);
       } catch (error) {
-        console.error('Error changing repair status:', error);
         alert('Failed to change repair status');
       }
     }

@@ -9,17 +9,12 @@ import axios from "axios";
 
 // Configure axios defaults with mobile-friendly settings
 const getBaseURL = () => {
-  if (process.env.NODE_ENV === "production") {
-    // In production, use relative URLs for same-origin requests
-    return "";
-  } else {
-    // In development, use localhost with correct port
-    return "http://localhost:5000";
-  }
+  // Use empty string to leverage Vite proxy in development
+  // Vite proxy will forward /api requests to http://localhost:5000
+  return "";
 };
 
 axios.defaults.baseURL = getBaseURL();
-console.log("Axios baseURL set to:", axios.defaults.baseURL);
 axios.defaults.timeout = 30000; // 30 second timeout for mobile
 axios.defaults.headers.common["Content-Type"] = "application/json";
 axios.defaults.headers.common["Accept"] = "application/json";
@@ -53,20 +48,28 @@ axios.interceptors.request.use(
     }
 
     // Get token from storage
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-    
-    if (token && isTokenValid(token)) {
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
+
+    if (token) {
+      // Always send token if it exists, let server validate it
+      // This handles cases where client-side validation might be too strict
       config.headers.Authorization = `Bearer ${token}`;
-    } else if (token && !isTokenValid(token)) {
-      // Clean up expired token
-      localStorage.removeItem("token");
-      sessionStorage.removeItem("token");
+
+      // Only clean up if token is clearly invalid (malformed)
+      if (!isTokenValid(token)) {
+        console.warn(
+          "Token validation failed, but sending anyway. Server will decide."
+        );
+        // Don't remove token here - let server response handle it
+      }
+    } else {
+      console.warn("No token found in storage for request to:", config.url);
     }
 
     return config;
   },
   (error) => {
-    console.error("Request interceptor error:", error);
     return Promise.reject(error);
   }
 );
@@ -78,7 +81,6 @@ axios.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      console.log("Token expired or invalid, clearing auth data");
       localStorage.removeItem("token");
       sessionStorage.removeItem("token");
     }
@@ -104,23 +106,21 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize authentication state
   const initializeAuth = useCallback(async () => {
-    console.log("Initializing authentication...");
     setIsLoading(true);
 
     try {
       // Check both localStorage and sessionStorage for mobile compatibility
       let token = localStorage.getItem("token");
+      let userData = localStorage.getItem("user");
       let tokenSource = "localStorage";
 
       if (!token) {
         token = sessionStorage.getItem("token");
+        userData = sessionStorage.getItem("user");
         tokenSource = "sessionStorage";
       }
 
-      console.log("Token source:", tokenSource);
-
       if (!token) {
-        console.log("No token found - user not authenticated");
         setUser(null);
         setIsLoading(false);
         setIsInitialized(true);
@@ -128,39 +128,39 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (!isTokenValid(token)) {
-        console.log("Token expired or invalid, clearing");
         localStorage.removeItem("token");
+        localStorage.removeItem("user");
         sessionStorage.removeItem("token");
+        sessionStorage.removeItem("user");
         setUser(null);
         setIsLoading(false);
         setIsInitialized(true);
         return;
       }
 
-      // Decode token to get user data
-      const userData = decodeToken(token);
-      if (userData && userData.username && userData.role) {
-        console.log("User restored from token:", userData);
-        setUser(userData);
+      // Use stored user data if available
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
 
-        // Ensure token is in both storages for mobile
+        // Ensure data is in both storages for mobile
         if (tokenSource === "localStorage") {
           sessionStorage.setItem("token", token);
+          sessionStorage.setItem("user", userData);
         } else {
           localStorage.setItem("token", token);
+          localStorage.setItem("user", userData);
         }
       } else {
-        console.log(
-          "Failed to decode token or invalid user data - user not authenticated"
-        );
         localStorage.removeItem("token");
         sessionStorage.removeItem("token");
         setUser(null);
       }
     } catch (error) {
-      console.error("Auth initialization error:", error);
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
       sessionStorage.removeItem("token");
+      sessionStorage.removeItem("user");
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -175,52 +175,57 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      console.log("Login attempt for user:", username);
       setIsLoading(true);
 
-      const response = await axios.post("/api/auth/login", { username, password });
+      const response = await axios.post("/api/auth/login", {
+        username,
+        password,
+      });
       const { token, user: userData } = response.data;
 
-      if (!token) {
-        throw new Error("No token received from server");
+      if (!token || !userData) {
+        throw new Error("No token or user data received from server");
       }
 
-      // Store token in both storages for reliability
+      // Store token and user data in both storages for reliability
       localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(userData));
       sessionStorage.setItem("token", token);
+      sessionStorage.setItem("user", JSON.stringify(userData));
 
-      // Decode token to get user data
-      const decodedUser = decodeToken(token);
-      if (decodedUser) {
-        setUser(decodedUser);
-        setIsLoading(false);
-        setIsInitialized(true);
-        console.log("Login successful for user:", decodedUser.username);
-      } else {
-        throw new Error("Failed to decode token");
-      }
+      // Set user state with full user data from server
+      setUser(userData);
+      setIsLoading(false);
+      setIsInitialized(true);
 
       return userData;
     } catch (error) {
-      console.error("Login error:", error);
-      
-      // Clear any existing token on login failure
+      // Clear any existing data on login failure
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
       sessionStorage.removeItem("token");
+      sessionStorage.removeItem("user");
       setUser(null);
       setIsLoading(false);
       setIsInitialized(true);
 
       // Provide user-friendly error messages
       let errorMessage = "Login failed. Please try again.";
-      
+
       if (error.response?.status === 401) {
-        errorMessage = "Invalid username or password. Please check your credentials.";
+        errorMessage =
+          "Invalid username or password. Please check your credentials.";
       } else if (error.response?.status === 500) {
         errorMessage = "Server error. Please try again later.";
-      } else if (error.code === "NETWORK_ERROR" || error.message?.includes("Network Error")) {
+      } else if (
+        error.code === "NETWORK_ERROR" ||
+        error.message?.includes("Network Error")
+      ) {
         errorMessage = "Network error. Please check your internet connection.";
-      } else if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+      } else if (
+        error.code === "ECONNABORTED" ||
+        error.message?.includes("timeout")
+      ) {
         errorMessage = "Request timed out. Please try again.";
       }
 
@@ -229,9 +234,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = useCallback(() => {
-    console.log("Logging out user");
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
     setUser(null);
     setIsLoading(false);
     setIsInitialized(false);
@@ -262,7 +268,6 @@ export const AuthProvider = ({ children }) => {
         return newToken;
       }
     } catch (error) {
-      console.error("Token refresh failed:", error);
       logout();
       throw error;
     }

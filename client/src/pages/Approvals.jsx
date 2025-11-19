@@ -41,7 +41,6 @@ const Approvals = () => {
       const response = await axios.get('/api/approvals', { params });
       setApprovals(response.data);
     } catch (error) {
-      console.error('Error fetching approvals:', error);
     }
   };
 
@@ -67,7 +66,6 @@ const Approvals = () => {
         ? 'Approved and executed successfully!' 
         : 'Approved and forwarded to admin!');
     } catch (error) {
-      console.error('Error approving:', error);
       alert('Failed to approve: ' + (error.response?.data?.error || error.message));
     }
   };
@@ -87,7 +85,6 @@ const Approvals = () => {
       setModalOpen(false);
       alert('Request rejected successfully');
     } catch (error) {
-      console.error('Error rejecting:', error);
       alert('Failed to reject: ' + (error.response?.data?.error || error.message));
     }
   };

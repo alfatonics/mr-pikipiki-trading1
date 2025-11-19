@@ -1,12 +1,31 @@
-import { Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { 
-  FiHome, FiPackage, FiUsers, FiUserCheck, FiFileText, 
-  FiTruck, FiTool, FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX, FiCheckCircle, FiClock, FiBell 
-} from 'react-icons/fi';
-import { useState, useEffect } from 'react';
-import ModernSidebar from './ModernSidebar';
-import TopBar from './TopBar';
+import { Outlet, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  FiHome,
+  FiPackage,
+  FiUsers,
+  FiUserCheck,
+  FiFileText,
+  FiTruck,
+  FiTool,
+  FiBarChart2,
+  FiSettings,
+  FiLogOut,
+  FiMenu,
+  FiX,
+  FiCheckCircle,
+  FiClock,
+  FiBell,
+  FiDollarSign,
+  FiClipboard,
+  FiMessageCircle,
+  FiCalendar,
+  FiFolder,
+  FiBox,
+} from "react-icons/fi";
+import { useState, useEffect } from "react";
+import ModernSidebar from "./ModernSidebar";
+import TopBar from "./TopBar";
 
 const Layout = () => {
   const { user, logout, isLoading, isInitialized } = useAuth();
@@ -16,39 +35,154 @@ const Layout = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Debug logging
-  console.log('Layout render:', { user, isLoading, isInitialized });
 
   // Handle navigation in useEffect to avoid warnings
   useEffect(() => {
     if (isInitialized && !isLoading && user && (!user.username || !user.role)) {
-      console.log('Layout: Invalid user data, redirecting to login', { user });
-      navigate('/login');
+      navigate("/login");
     }
   }, [user, isLoading, isInitialized, navigate]);
 
   const menuItems = [
-    { path: '/', icon: FiHome, label: 'Dashboard', roles: ['all'] },
-    { path: '/motorcycles', icon: FiPackage, label: 'Motorcycles', roles: ['admin', 'sales', 'registration'] },
-    { path: '/suppliers', icon: FiUsers, label: 'Suppliers', roles: ['admin', 'sales'] },
-    { path: '/customers', icon: FiUserCheck, label: 'Customers', roles: ['admin', 'sales', 'secretary'] },
-    { path: '/contracts', icon: FiFileText, label: 'Contracts', roles: ['admin', 'sales', 'secretary'] },
-    { path: '/transport', icon: FiTruck, label: 'Transport', roles: ['admin', 'transport', 'sales'] },
-    { path: '/repairs', icon: FiTool, label: 'Repairs', roles: ['admin', 'staff'] },
-    { path: '/my-jobs', icon: FiTool, label: 'My Jobs', roles: ['mechanic'] },
-    { path: '/my-requests', icon: FiClock, label: 'My Requests', roles: ['sales', 'mechanic', 'transport', 'registration', 'secretary', 'staff'] },
-    { path: '/approvals', icon: FiCheckCircle, label: 'Approvals', roles: ['admin', 'sales'] },
-    { path: '/reports', icon: FiBarChart2, label: 'Reports', roles: ['admin', 'sales'] },
-    { path: '/notifications', icon: FiBell, label: 'Notifications', roles: ['all'] },
-    { path: '/users', icon: FiSettings, label: 'Users', roles: ['admin'] },
+    { path: "/", icon: FiHome, label: "Dashboard", roles: ["all"] },
+    {
+      path: "/motorcycles",
+      icon: FiPackage,
+      label: "Motorcycles",
+      roles: ["admin", "sales", "registration"],
+    },
+    {
+      path: "/suppliers",
+      icon: FiUsers,
+      label: "Suppliers",
+      roles: ["admin", "sales"],
+    },
+    {
+      path: "/customers",
+      icon: FiUserCheck,
+      label: "Customers",
+      roles: ["admin", "sales", "secretary"],
+    },
+    {
+      path: "/crm",
+      icon: FiUsers,
+      label: "CRM",
+      roles: ["admin", "sales", "secretary"],
+    },
+    {
+      path: "/tasks",
+      icon: FiCheckCircle,
+      label: "Tasks",
+      roles: ["transport", "admin"],
+    },
+    {
+      path: "/contracts",
+      icon: FiFileText,
+      label: "Contracts",
+      roles: ["admin", "sales", "secretary"],
+    },
+    {
+      path: "/transport",
+      icon: FiTruck,
+      label: "Transport",
+      roles: ["admin", "transport", "sales"],
+    },
+    {
+      path: "/repairs",
+      icon: FiTool,
+      label: "Repairs",
+      roles: ["admin", "staff"],
+    },
+    { path: "/my-jobs", icon: FiTool, label: "My Jobs", roles: ["mechanic"] },
+    {
+      path: "/mechanic-reports",
+      icon: FiBarChart2,
+      label: "Reports",
+      roles: ["mechanic"],
+    },
+    {
+      path: "/my-requests",
+      icon: FiClock,
+      label: "My Requests",
+      roles: [
+        "sales",
+        "mechanic",
+        "transport",
+        "registration",
+        "secretary",
+        "staff",
+      ],
+    },
+    {
+      path: "/approvals",
+      icon: FiCheckCircle,
+      label: "Approvals",
+      roles: ["admin", "sales", "secretary"],
+    },
+    {
+      path: "/reports",
+      icon: FiBarChart2,
+      label: "Reports",
+      roles: ["admin", "sales", "secretary"],
+    },
+    {
+      path: "/cashier",
+      icon: FiDollarSign,
+      label: "Cashier & Finance",
+      roles: ["admin", "cashier", "sales"],
+    },
+    {
+      path: "/notifications",
+      icon: FiBell,
+      label: "Notifications",
+      roles: ["all"],
+    },
+    {
+      path: "/messages",
+      icon: FiMessageCircle,
+      label: "Messages",
+      roles: ["all"],
+    },
+    {
+      path: "/meetings",
+      icon: FiCalendar,
+      label: "Meetings",
+      roles: ["admin", "secretary"],
+    },
+    {
+      path: "/staff-tasks",
+      icon: FiCheckCircle,
+      label: "Staff Tasks",
+      roles: ["admin", "secretary"],
+    },
+    {
+      path: "/attendance",
+      icon: FiUserCheck,
+      label: "Attendance",
+      roles: ["admin", "secretary"],
+    },
+    {
+      path: "/documents",
+      icon: FiFolder,
+      label: "Documents",
+      roles: ["admin", "secretary"],
+    },
+    {
+      path: "/office-supplies",
+      icon: FiBox,
+      label: "Office Supplies",
+      roles: ["admin", "secretary"],
+    },
+    { path: "/users", icon: FiSettings, label: "Users", roles: ["admin"] },
   ];
 
-  const filteredMenuItems = menuItems.filter(item => 
-    item.roles.includes('all') || item.roles.includes(user?.role)
+  const filteredMenuItems = menuItems.filter(
+    (item) => item.roles.includes("all") || item.roles.includes(user?.role)
   );
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const handleToggleTheme = () => {
@@ -61,7 +195,6 @@ const Layout = () => {
 
   // Show loading state while authentication is being initialized
   if (!isInitialized || isLoading) {
-    console.log('Layout: Showing loading state', { isInitialized, isLoading });
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -74,7 +207,6 @@ const Layout = () => {
 
   // If no user after initialization, redirect to login
   if (!user) {
-    console.log('Layout: No user found, redirecting to login', { user, isInitialized, isLoading });
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -98,7 +230,11 @@ const Layout = () => {
   }
 
   return (
-    <div className={`flex h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
+    <div
+      className={`flex h-screen ${
+        isDarkMode ? "dark bg-gray-900" : "bg-gray-50"
+      }`}
+    >
       {/* Modern Sidebar */}
       <ModernSidebar
         user={user}
@@ -110,7 +246,10 @@ const Layout = () => {
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)}></div>
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50"
+            onClick={() => setSidebarOpen(false)}
+          ></div>
           <div className="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white shadow-lg overflow-y-auto">
             <ModernSidebar
               user={user}
@@ -124,7 +263,9 @@ const Layout = () => {
       )}
 
       {/* Main Content */}
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300`}>
+      <div
+        className={`flex-1 flex flex-col overflow-hidden transition-all duration-300`}
+      >
         {/* Modern Top Bar */}
         <TopBar
           user={user}

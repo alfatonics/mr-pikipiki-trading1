@@ -22,18 +22,25 @@ import Approvals from "./pages/Approvals";
 import MyRequests from "./pages/MyRequests";
 import MyJobs from "./pages/MyJobs";
 import Notifications from "./pages/Notifications";
-import DebugPage from "./pages/DebugPage";
 import Error404 from "./pages/Error404";
+import ContractForms from "./pages/ContractForms";
+import InspectionForm from "./pages/InspectionForm";
+import Cashier from "./pages/Cashier";
+import CRM from "./pages/CRM";
+import Tasks from "./pages/Tasks";
+import MechanicReports from "./pages/MechanicReports";
+import Messages from "./pages/Messages";
+import Meetings from "./pages/Meetings";
+import StaffTasks from "./pages/StaffTasks";
+import Attendance from "./pages/Attendance";
+import Documents from "./pages/Documents";
+import OfficeSupplies from "./pages/OfficeSupplies";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import Layout from "./components/Layout";
 
 const PrivateRoute = ({ children }) => {
   const { user, isLoading, isInitialized } = useAuth();
-
-  console.log("PrivateRoute check:", {
-    user: !!user,
-    isLoading,
-    isInitialized,
-  });
 
   // Show loading while authentication is being checked
   if (!isInitialized || isLoading) {
@@ -49,15 +56,12 @@ const PrivateRoute = ({ children }) => {
 
   // Redirect to login if not authenticated
   if (!user) {
-    console.log("PrivateRoute: No user, redirecting to login");
-
     // Force redirect on mobile to ensure proper navigation
     const isMobile =
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
         navigator.userAgent
       );
     if (isMobile) {
-      console.log("Mobile detected - forcing redirect to login");
       window.location.href = "/login";
       return null;
     }
@@ -65,18 +69,14 @@ const PrivateRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  console.log("PrivateRoute: User authenticated, showing content");
   return children;
 };
 
 const PublicRoute = ({ children }) => {
   const { user, isLoading, isInitialized } = useAuth();
 
-  console.log("PublicRoute check:", { user: !!user, isLoading, isInitialized });
-
   // Show loading while authentication is being checked
   if (!isInitialized || isLoading) {
-    console.log("PublicRoute: Showing loading state");
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -89,15 +89,12 @@ const PublicRoute = ({ children }) => {
 
   // Redirect to dashboard if already authenticated
   if (user) {
-    console.log("PublicRoute: User authenticated, redirecting to dashboard");
-
     // Force redirect on mobile to ensure proper navigation
     const isMobile =
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
         navigator.userAgent
       );
     if (isMobile) {
-      console.log("Mobile detected - forcing redirect");
       window.location.href = "/";
       return null;
     }
@@ -105,7 +102,6 @@ const PublicRoute = ({ children }) => {
     return <Navigate to="/" replace />;
   }
 
-  console.log("PublicRoute: Showing login page");
   return children;
 };
 
@@ -124,9 +120,6 @@ function App() {
                   </PublicRoute>
                 }
               />
-
-              {/* Debug route - accessible without authentication */}
-              <Route path="/debug" element={<DebugPage />} />
 
               <Route
                 path="/"
@@ -149,6 +142,20 @@ function App() {
                 <Route path="my-requests" element={<MyRequests />} />
                 <Route path="users" element={<Users />} />
                 <Route path="notifications" element={<Notifications />} />
+                <Route path="contract-forms" element={<ContractForms />} />
+                <Route path="inspection-form" element={<InspectionForm />} />
+                <Route path="cashier" element={<Cashier />} />
+                <Route path="crm" element={<CRM />} />
+                <Route path="tasks" element={<Tasks />} />
+                <Route path="mechanic-reports" element={<MechanicReports />} />
+                <Route path="messages" element={<Messages />} />
+                <Route path="meetings" element={<Meetings />} />
+                <Route path="staff-tasks" element={<StaffTasks />} />
+                <Route path="attendance" element={<Attendance />} />
+                <Route path="documents" element={<Documents />} />
+                <Route path="office-supplies" element={<OfficeSupplies />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="settings" element={<Settings />} />
               </Route>
 
               {/* Catch all route */}
