@@ -44,4 +44,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-export default app;
+// Vercel serverless function handler
+export default async function handler(req, res) {
+  console.log('🔧 Vercel handler called:', req.method, req.url);
+  return app(req, res);
+}
