@@ -11,10 +11,5 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "server/vercel.js": {
-      "runtime": "nodejs20.x"
-    }
-  }
+  ]
 }
