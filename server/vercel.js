@@ -8,46 +8,17 @@ console.log('🌍 NODE_ENV:', process.env.NODE_ENV);
 console.log('🔑 JWT Secret exists:', !!process.env.JWT_SECRET);
 console.log('💾 DATABASE_URL exists:', !!process.env.DATABASE_URL);
 
-// Add request logging middleware
-app.use((req, res, next) => {
-  console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('📍 Original URL:', req.originalUrl);
-  next();
-});
-
-// Add response logging middleware
-app.use((req, res, next) => {
-  const originalSend = res.send;
-  res.send = function(data) {
-    console.log(`📤 ${new Date().toISOString()} - Response for ${req.method} ${req.url} - Status: ${res.statusCode}`);
-    return originalSend.call(this, data);
-  };
-  next();
-});
-
-// Add error logging
-process.on('uncaughtException', (error) => {
-  console.error('💥 Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-// Error handling middleware should be after all routes
-app.use((err, req, res, next) => {
-  console.error('🚨 Error:', err);
-  console.error('📍 Request URL:', req.url);
-  console.error('📍 Request method:', req.method);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
-});
-
 // Wrap Express app with serverless-http for Vercel
 const handler = serverless(app, {
-  binary: ['image/*', 'application/pdf', 'application/octet-stream']
+  binary: ['image/*', 'application/pdf', 'application/octet-stream'],
+  request(request, event, context) {
+    // Preserve the original path from the rewrite
+    if (event.path) {
+      request.url = event.path + (request.url.includes('?') ? request.url.substring(request.url.indexOf('?')) : '');
+      request.originalUrl = event.path + (request.originalUrl.includes('?') ? request.originalUrl.substring(request.originalUrl.indexOf('?')) : '');
+    }
+    return request;
+  }
 });
 
 export default handler;
