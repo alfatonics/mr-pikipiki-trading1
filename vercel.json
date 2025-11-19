@@ -6,7 +6,7 @@
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist",
-        "installCommand": "cd client && npm install"
+        "installCommand": "cd client && npm install --include=dev"
       }
     },
     {
