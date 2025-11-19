@@ -1,4 +1,5 @@
 import app from './app.js';
+import serverless from 'serverless-http';
 
 // Enhanced Vercel entry point with detailed logging
 console.log('🚀 Vercel entry point loaded');
@@ -44,8 +45,9 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Vercel serverless function handler
-export default async function handler(req, res) {
-  console.log('🔧 Vercel handler called:', req.method, req.url);
-  return app(req, res);
-}
+// Wrap Express app with serverless-http for Vercel
+const handler = serverless(app, {
+  binary: ['image/*', 'application/pdf', 'application/octet-stream']
+});
+
+export default handler;
