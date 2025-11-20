@@ -12,6 +12,14 @@ const handler = serverless(app, {
 console.log("✅ Serverless handler created");
 
 export default async function (req, res) {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    return res.status(200).end();
+  }
+
   // Vercel rewrites /api/* to /api/index
   // Extract the original path from headers or request URL
   
