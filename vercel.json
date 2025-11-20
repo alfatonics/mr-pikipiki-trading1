@@ -3,10 +3,6 @@
   "outputDirectory": "client/dist",
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/server/vercel.js"
-    },
-    {
       "handle": "filesystem"
     },
     {
