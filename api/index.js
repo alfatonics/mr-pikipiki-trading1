@@ -12,74 +12,99 @@ const handler = serverless(app, {
 console.log("✅ Serverless handler created");
 
 export default async function (req, res) {
-  // Vercel rewrites /api/* to /api/index
-  // We need to extract the original path from the request
-  // The original path should be in the URL that was requested, not the rewritten one
+  // Vercel rewrites /api/* to /api/index?path=*
+  // Extract the original path from query parameter or headers
+  
+  // Store original request properties before modification
+  const originalUrl = req.url;
+  const originalPath = req.path;
+  const originalQuery = req.query;
 
-  // Get the original request URL from various possible sources
-  let originalUrl = null;
+  // Log all headers for debugging
+  console.log("🔍 All request headers:", Object.keys(req.headers));
+  console.log("🔍 Request URL:", originalUrl);
+  console.log("🔍 Request path:", originalPath);
+  console.log("🔍 Request query:", originalQuery);
+  console.log("🔍 Request method:", req.method);
 
-  // Check Vercel-specific headers first
-  originalUrl =
+  let targetPath = null;
+
+  // Method 1: Check Vercel headers (most reliable)
+  const vercelPath = 
     req.headers["x-vercel-original-path"] ||
     req.headers["x-original-path"] ||
     req.headers["x-vercel-rewrite"] ||
     req.headers["x-forwarded-uri"] ||
     req.headers["x-forwarded-path"];
-
-  // If not in headers, check if req.url contains the original path
-  // When Vercel rewrites, sometimes the original is still in req.url
-  if (!originalUrl) {
-    const currentUrl = req.url || "/";
-    // If it's not /api/index, it might be the original path
-    if (
-      currentUrl.startsWith("/api/") &&
-      currentUrl !== "/api/index" &&
-      currentUrl !== "/api"
-    ) {
-      originalUrl = currentUrl;
-    }
+  
+  if (vercelPath && vercelPath.startsWith("/api/")) {
+    targetPath = vercelPath;
+    console.log("✅ Found path from Vercel headers:", targetPath);
   }
 
-  // If we still don't have it, and we're at /api/index, try to get from query
-  if (!originalUrl) {
-    const currentUrl = req.url || "/";
-
-    // Check if we're at the rewritten endpoint
-    if (
-      currentUrl === "/api/index" ||
-      currentUrl === "/api" ||
-      currentUrl.includes("/api/index") ||
-      currentUrl.includes("?path=")
-    ) {
-      // Try query parameter first (if rewrite used ?path=)
-      let pathParam = null;
-
-      // Method 1: From parsed query object
-      if (req.query && req.query.path) {
-        pathParam = req.query.path;
-      }
-      // Method 2: Parse from URL string
-      else if (currentUrl.includes("?path=")) {
-        try {
-          const urlParts = currentUrl.split("?");
-          if (urlParts.length > 1) {
-            const params = new URLSearchParams(urlParts[1]);
-            pathParam = params.get("path");
-          }
-        } catch (e) {
-          console.error("Error parsing URL:", e);
+  // Method 2: Extract from query parameter (from vercel.json rewrite)
+  if (!targetPath) {
+    let pathParam = null;
+    
+    // Try from parsed query object (if serverless-http already parsed it)
+    if (originalQuery && typeof originalQuery.path === 'string') {
+      pathParam = originalQuery.path;
+      console.log("✅ Found path from req.query:", pathParam);
+    }
+    // Try parsing from URL string directly
+    else if (originalUrl && originalUrl.includes("?path=")) {
+      try {
+        const urlParts = originalUrl.split("?");
+        if (urlParts.length > 1) {
+          const params = new URLSearchParams(urlParts[1]);
+          pathParam = params.get("path");
+          console.log("✅ Found path from URL parsing:", pathParam);
         }
+      } catch (e) {
+        console.error("❌ Error parsing URL:", e);
       }
-
-      if (pathParam) {
-        originalUrl = `/api/${pathParam}`;
-      }
+    }
+    
+    if (pathParam) {
+      targetPath = `/api/${pathParam}`;
     }
   }
 
-  // Use originalUrl if found, otherwise fall back to req.url
-  let targetPath = originalUrl || req.url || req.path || "/api/health";
+  // Method 3: If URL is already the full path (not rewritten), use it
+  if (!targetPath && originalUrl) {
+    if (originalUrl.startsWith("/api/") && !originalUrl.includes("/api/index") && originalUrl !== "/api") {
+      targetPath = originalUrl.split("?")[0]; // Remove query string
+      console.log("✅ Using original URL as path:", targetPath);
+    }
+  }
+
+  // Fallback: if we're at /api/index and can't determine path, return error
+  if (!targetPath) {
+    const currentUrl = originalUrl || originalPath || "/";
+    if (currentUrl.includes("/api/index") || currentUrl === "/api" || currentUrl.includes("?path=")) {
+      console.error("❌ Could not determine original API path from request:", {
+        url: originalUrl,
+        path: originalPath,
+        query: originalQuery,
+        headers: {
+          "x-vercel-original-path": req.headers["x-vercel-original-path"],
+          "x-forwarded-uri": req.headers["x-forwarded-uri"],
+          "x-forwarded-path": req.headers["x-forwarded-path"],
+        }
+      });
+      // Return 404 instead of 405 to indicate route not found
+      return res.status(404).json({ 
+        error: "API route not found",
+        message: "Could not determine the requested API endpoint",
+        debug: {
+          url: originalUrl,
+          path: originalPath,
+          query: originalQuery
+        }
+      });
+    }
+    targetPath = currentUrl;
+  }
 
   // Ensure it starts with /api
   if (!targetPath.startsWith("/api")) {
@@ -89,19 +114,27 @@ export default async function (req, res) {
   // Remove query string from path for routing
   const pathWithoutQuery = targetPath.split("?")[0];
 
-  // Update req properties for Express routing
-  // This must be done before passing to serverless-http
+  // Update req properties for Express routing BEFORE serverless-http processes it
   req.url = targetPath;
   req.originalUrl = targetPath;
   req.path = pathWithoutQuery;
+  
+  // Preserve query parameters (except path) if any
+  if (originalQuery && Object.keys(originalQuery).length > 0) {
+    const newQuery = { ...originalQuery };
+    delete newQuery.path;
+    if (Object.keys(newQuery).length > 0) {
+      req.query = newQuery;
+    }
+  }
 
-  console.log("🔔 API request received:", {
+  console.log("🔔 API request processed:", {
     method: req.method,
-    originalRequestUrl: req.url,
-    targetPath: targetPath,
-    path: req.path,
-    query: req.query,
     originalUrl: originalUrl,
+    targetPath: targetPath,
+    finalPath: req.path,
+    query: req.query,
+    vercelPath: vercelPath,
     headers: {
       "content-type": req.headers["content-type"],
       "x-vercel-original-path": req.headers["x-vercel-original-path"],
