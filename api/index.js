@@ -14,12 +14,12 @@ console.log("✅ Serverless handler created");
 export default async function (req, res) {
   // IMMEDIATE TEST: Return simple response to verify function is being called
   if (req.url === "/api/ping" || req.path === "/api/ping") {
-    return res.json({ 
+    return res.json({
       message: "Function is working!",
       method: req.method,
       url: req.url,
       path: req.path,
-      query: req.query
+      query: req.query,
     });
   }
 
@@ -51,17 +51,26 @@ export default async function (req, res) {
   console.log("🔍 URL:", originalUrl);
   console.log("🔍 Path:", originalPath);
   console.log("🔍 Query:", JSON.stringify(originalQuery));
-  console.log("🔍 Headers:", JSON.stringify(req.headers, null, 2));
+  
+  // Log only relevant headers to avoid too much output
+  const relevantHeaders = {
+    "x-vercel-original-path": req.headers["x-vercel-original-path"],
+    "x-original-path": req.headers["x-original-path"],
+    "x-forwarded-uri": req.headers["x-forwarded-uri"],
+    "x-forwarded-path": req.headers["x-forwarded-path"],
+    "x-vercel-rewrite": req.headers["x-vercel-rewrite"],
+  };
+  console.log("🔍 Relevant Headers:", JSON.stringify(relevantHeaders, null, 2));
 
   let targetPath = null;
 
-  // Method 1: Check Vercel headers for original path
-  const vercelPath = 
+  // Method 1: Check Vercel headers for original path (most reliable)
+  const vercelPath =
     req.headers["x-vercel-original-path"] ||
     req.headers["x-original-path"] ||
     req.headers["x-forwarded-uri"] ||
     req.headers["x-forwarded-path"];
-  
+
   if (vercelPath && vercelPath.startsWith("/api/")) {
     targetPath = vercelPath;
     console.log("✅ Found path from Vercel headers:", targetPath);
@@ -69,8 +78,8 @@ export default async function (req, res) {
 
   // Method 2: Extract from query parameter (if rewrite passes it)
   if (!targetPath && originalQuery && originalQuery.path) {
-    const pathParam = Array.isArray(originalQuery.path) 
-      ? originalQuery.path.join('/')
+    const pathParam = Array.isArray(originalQuery.path)
+      ? originalQuery.path.join("/")
       : originalQuery.path;
     targetPath = `/api/${pathParam}`;
     console.log("✅ Found path from query parameter:", targetPath);
@@ -94,28 +103,55 @@ export default async function (req, res) {
   }
 
   // Method 4: If URL is already the full path (not rewritten), use it
-  if (!targetPath && originalUrl && originalUrl.startsWith("/api/") && !originalUrl.includes("/api/index") && originalUrl !== "/api") {
+  if (
+    !targetPath &&
+    originalUrl &&
+    originalUrl.startsWith("/api/") &&
+    !originalUrl.includes("/api/index") &&
+    originalUrl !== "/api"
+  ) {
     targetPath = originalUrl.split("?")[0];
     console.log("✅ Using original URL as path:", targetPath);
   }
 
-  // Final fallback
+  // Final fallback - if we're at /api/index after rewrite, try to reconstruct
   if (!targetPath) {
-    // If we're at /api/index, we couldn't determine the original path
-    if (originalUrl.includes("/api/index") || originalUrl === "/api") {
+    // If URL is /api/index or /api, this means we're at the rewrite destination
+    // Try to get original path from the rewrite pattern
+    // Vercel rewrite: /api/(.*) -> /api/index
+    // The original path segment should be somewhere...
+    
+    if (originalUrl === "/api/index" || originalUrl === "/api" || originalUrl === "/") {
+      // Check if we can get it from the request somehow
+      // Sometimes Vercel passes it in a different way
+      const allHeaders = Object.keys(req.headers).filter(h => 
+        h.toLowerCase().includes('path') || 
+        h.toLowerCase().includes('uri') || 
+        h.toLowerCase().includes('original') ||
+        h.toLowerCase().includes('rewrite')
+      );
+      
       console.error("❌ CRITICAL: Could not determine original API path!");
+      console.error("❌ All path-related headers:", allHeaders.map(h => `${h}: ${req.headers[h]}`));
+      
       return res.status(500).json({
         error: "Internal routing error",
-        message: "Could not determine the requested API endpoint",
+        message: "Could not determine the requested API endpoint from Vercel rewrite",
         debug: {
           url: originalUrl,
           path: originalPath,
           query: originalQuery,
-          method: req.method
-        }
+          method: req.method,
+          allHeaders: allHeaders.reduce((acc, h) => {
+            acc[h] = req.headers[h];
+            return acc;
+          }, {})
+        },
       });
     }
-    targetPath = originalUrl || "/api/health";
+    
+    // Not at /api/index, use URL as-is (might be direct access)
+    targetPath = originalUrl;
   }
 
   // Ensure it starts with /api
