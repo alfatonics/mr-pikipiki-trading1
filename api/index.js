@@ -20,6 +20,19 @@ export default async function (req, res) {
     return res.status(200).end();
   }
 
+  // TEST ENDPOINT: Return request details for debugging
+  if (req.url === '/api/test' || req.path === '/api/test') {
+    return res.json({
+      method: req.method,
+      url: req.url,
+      path: req.path,
+      originalUrl: req.originalUrl,
+      query: req.query,
+      headers: req.headers,
+      body: req.body
+    });
+  }
+
   // Vercel rewrites /api/* to /api/index
   // Extract the original path from headers or request URL
   
