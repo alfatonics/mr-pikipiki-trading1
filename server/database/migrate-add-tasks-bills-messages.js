@@ -190,3 +190,4 @@ if (
 }
 
 export default migrate;
+

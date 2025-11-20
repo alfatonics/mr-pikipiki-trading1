@@ -247,3 +247,4 @@ class StaffTask {
 }
 
 export default StaffTask;
+

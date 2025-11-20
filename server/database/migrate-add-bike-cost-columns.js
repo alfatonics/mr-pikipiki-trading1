@@ -49,3 +49,4 @@ if (
 }
 
 export default migrate;
+

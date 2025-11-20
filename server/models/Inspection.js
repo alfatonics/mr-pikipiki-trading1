@@ -335,3 +335,4 @@ class Inspection {
 }
 
 export default Inspection;
+

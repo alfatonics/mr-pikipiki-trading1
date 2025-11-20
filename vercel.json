@@ -1,15 +1,14 @@
 {
   "buildCommand": "cd client && npm install --include=dev && npm run build",
   "outputDirectory": "client/dist",
-  "framework": null,
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/server/vercel.js"
+      "source": "/api/(.*)",
+      "destination": "/server/vercel.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/((?!api/)(?!.*\\.(js|mjs|css|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|json|pdf|map|webp|avif)$).*)",
+      "destination": "/index.html"
     }
   ]
 }
