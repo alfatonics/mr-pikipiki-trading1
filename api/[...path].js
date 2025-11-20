@@ -12,6 +12,17 @@ const handler = serverless(app, {
 console.log("✅ Serverless handler created");
 
 export default async function (req, res) {
+  // IMMEDIATE TEST: Return simple response to verify function is being called
+  if (req.url === "/api/ping" || req.path === "/api/ping") {
+    return res.json({ 
+      message: "Function is working!",
+      method: req.method,
+      url: req.url,
+      path: req.path,
+      query: req.query
+    });
+  }
+
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
