@@ -69,27 +69,31 @@ app.use(
 // Handle both query parameter method and custom header method
 app.use((req, res, next) => {
   let newPath = null;
-  
-  // Method 1: Check custom header set by api/index.js handler
-  if (req.headers['x-target-path']) {
-    newPath = req.headers['x-target-path'];
+
+  // Method 1: Check custom header set by api/index.js handler (PRIORITY)
+  if (req.headers["x-target-path"]) {
+    newPath = req.headers["x-target-path"];
     console.log("🔄 Rewriting path from header:", req.url, "->", newPath);
   }
-  // Method 2: Check if we're at /api/index with a path query parameter (from Vercel rewrite)
-  else if (
-    (req.url === "/api/index" ||
-      req.path === "/api/index" ||
-      req.url.startsWith("/api/index?")) &&
-    req.query &&
-    req.query.path
-  ) {
+  // Method 2: Check if we have a path query parameter (from Vercel rewrite)
+  // This handles both /api/index?path=... and /api/auth/login?path=...
+  else if (req.query && req.query.path) {
     const pathParam = Array.isArray(req.query.path)
       ? req.query.path.join("/")
       : req.query.path;
     newPath = `/api/${pathParam}`;
     console.log("🔄 Rewriting path from query:", req.url, "->", newPath);
   }
-  
+  // Method 3: Check if we're at /api/index (fallback)
+  else if (
+    req.url === "/api/index" ||
+    req.path === "/api/index" ||
+    req.url.startsWith("/api/index?")
+  ) {
+    // If we're at /api/index without path param, that's an error
+    console.warn("⚠️ At /api/index but no path parameter found");
+  }
+
   if (newPath) {
     // Rewrite the URL
     req.url = newPath;
@@ -103,7 +107,7 @@ app.use((req, res, next) => {
       req.query = newQuery;
     }
   }
-  
+
   next();
 });
 
