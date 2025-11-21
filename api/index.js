@@ -255,18 +255,41 @@ export default async function (req, res) {
     }
 
     // Call the serverless-http handler
-    // Note: serverless-http returns a promise that resolves when response is sent
-    const result = await handler(req, res);
-
-    console.log("✅ API handler completed:", {
-      method: req.method,
-      path: req.path,
-      statusCode: res.statusCode,
-      headersSent: res.headersSent,
+    // Wrap in a promise to ensure we wait for response
+    return new Promise((resolve, reject) => {
+      // Set up response finish handler
+      res.on('finish', () => {
+        console.log("✅ Response finished:", {
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          headersSent: res.headersSent,
+        });
+        resolve();
+      });
+      
+      res.on('close', () => {
+        console.log("✅ Response closed");
+        resolve();
+      });
+      
+      // Call the handler
+      handler(req, res)
+        .then((result) => {
+          console.log("✅ API handler promise resolved:", {
+            method: req.method,
+            path: req.path,
+            statusCode: res.statusCode,
+            headersSent: res.headersSent,
+          });
+          // Wait a bit to ensure response is sent
+          setTimeout(() => resolve(result), 100);
+        })
+        .catch((error) => {
+          console.error("❌ Handler promise rejected:", error);
+          reject(error);
+        });
     });
-    
-    // Return the result from serverless-http
-    return result;
   } catch (error) {
     console.error("❌ API handler error:", error);
     console.error("❌ Error stack:", error.stack);
