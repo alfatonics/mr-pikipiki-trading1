@@ -65,7 +65,33 @@ app.use(
     maxAge: 86400, // 24 hours cache for preflight requests
   })
 );
-// Add debug logging middleware BEFORE other middleware
+// Path rewriting middleware for Vercel rewrites
+// When Vercel rewrites /api/auth/login to /api/index?path=auth/login,
+// we need to extract the path from query parameter and rewrite the URL
+app.use((req, res, next) => {
+  // Check if we're at /api/index with a path query parameter (from Vercel rewrite)
+  if ((req.url === '/api/index' || req.path === '/api/index' || req.url.startsWith('/api/index?')) && req.query && req.query.path) {
+    const pathParam = Array.isArray(req.query.path) 
+      ? req.query.path.join('/')
+      : req.query.path;
+    const newPath = `/api/${pathParam}`;
+    
+    console.log('🔄 Rewriting path:', req.url, '->', newPath);
+    
+    // Rewrite the URL
+    req.url = newPath;
+    req.originalUrl = newPath;
+    req.path = newPath;
+    
+    // Remove path from query
+    const newQuery = { ...req.query };
+    delete newQuery.path;
+    req.query = newQuery;
+  }
+  next();
+});
+
+// Add debug logging middleware AFTER path rewriting
 app.use((req, res, next) => {
   console.log('🔍 Incoming request:', req.method, req.url);
   console.log('📍 Original URL:', req.originalUrl);
