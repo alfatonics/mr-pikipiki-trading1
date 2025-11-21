@@ -229,32 +229,22 @@ export default async function (req, res) {
 
   try {
     // CRITICAL: Ensure method is preserved right before calling handler
-    // serverless-http might have changed it, so set it again
     if (req.method !== originalMethod) {
       req.method = originalMethod;
       console.log("🔧 Restored method to:", req.method);
     }
 
-    // Call the serverless-http handler
-    // Important: Don't await - let it handle the response asynchronously
-    // But we need to return the promise so Vercel knows the function is still running
-    const handlerPromise = handler(req, res);
-
-    // Log after a short delay to see if response was sent
-    handlerPromise
-      .then(() => {
-        console.log("✅ Handler promise resolved:", {
-          statusCode: res.statusCode,
-          headersSent: res.headersSent,
-          finished: res.finished,
-        });
-      })
-      .catch((err) => {
-        console.error("❌ Handler promise rejected:", err);
-      });
-
-    // Return the promise - Vercel will wait for it
-    return handlerPromise;
+    // Call the serverless-http handler WITHOUT modifying req.url
+    // Express middleware will handle path rewriting to preserve response handling
+    const result = await handler(req, res);
+    
+    console.log("✅ Handler completed:", {
+      statusCode: res.statusCode,
+      headersSent: res.headersSent,
+      finished: res.finished,
+    });
+    
+    return result;
   } catch (error) {
     console.error("❌ API handler error:", error);
     console.error("❌ Error stack:", error.stack);
