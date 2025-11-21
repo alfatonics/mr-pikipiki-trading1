@@ -200,7 +200,6 @@ export default async function (req, res) {
     targetPath: targetPath,
     finalPath: req.path,
     query: req.query,
-    vercelPath: vercelPath,
     headers: {
       "content-type": req.headers["content-type"],
       "x-vercel-original-path": req.headers["x-vercel-original-path"],
