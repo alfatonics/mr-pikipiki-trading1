@@ -99,16 +99,22 @@ app.use((req, res, next) => {
 
 // CRITICAL: Method preservation middleware
 // serverless-http sometimes changes POST to GET, so we need to preserve it
-// Check if the request has a body but method is GET - likely a serverless-http bug
+// Check headers and content-length to determine if it should be POST
 app.use((req, res, next) => {
-  // If we have a body and method is GET, check if we should restore it to POST
-  // This happens when serverless-http incorrectly changes the method
-  if (req.method === 'GET' && req.body && Object.keys(req.body).length > 0) {
-    // Check Content-Type header to determine original method
+  // If method is GET but we have Content-Type and Content-Length indicating a body
+  // This is likely a serverless-http bug where it changed POST to GET
+  if (req.method === 'GET') {
     const contentType = req.headers['content-type'] || '';
-    if (contentType.includes('application/json') || contentType.includes('application/x-www-form-urlencoded')) {
-      // Likely should be POST
-      console.log("🔧 Restoring method from GET to POST (has body)");
+    const contentLength = req.headers['content-length'];
+    
+    // If we have JSON content type and content length > 0, it's likely a POST
+    if (contentType.includes('application/json') && contentLength && parseInt(contentLength) > 0) {
+      console.log("🔧 Restoring method from GET to POST (has JSON body)");
+      req.method = 'POST';
+    }
+    // Also check for form data
+    else if (contentType.includes('application/x-www-form-urlencoded') && contentLength && parseInt(contentLength) > 0) {
+      console.log("🔧 Restoring method from GET to POST (has form body)");
       req.method = 'POST';
     }
   }
