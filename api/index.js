@@ -255,41 +255,23 @@ export default async function (req, res) {
     }
 
     // Call the serverless-http handler
-    // Wrap in a promise to ensure we wait for response
-    return new Promise((resolve, reject) => {
-      // Set up response finish handler
-      res.on('finish', () => {
-        console.log("✅ Response finished:", {
-          method: req.method,
-          path: req.path,
-          statusCode: res.statusCode,
-          headersSent: res.headersSent,
-        });
-        resolve();
+    // Important: Don't await - let it handle the response asynchronously
+    // But we need to return the promise so Vercel knows the function is still running
+    const handlerPromise = handler(req, res);
+    
+    // Log after a short delay to see if response was sent
+    handlerPromise.then(() => {
+      console.log("✅ Handler promise resolved:", {
+        statusCode: res.statusCode,
+        headersSent: res.headersSent,
+        finished: res.finished,
       });
-      
-      res.on('close', () => {
-        console.log("✅ Response closed");
-        resolve();
-      });
-      
-      // Call the handler
-      handler(req, res)
-        .then((result) => {
-          console.log("✅ API handler promise resolved:", {
-            method: req.method,
-            path: req.path,
-            statusCode: res.statusCode,
-            headersSent: res.headersSent,
-          });
-          // Wait a bit to ensure response is sent
-          setTimeout(() => resolve(result), 100);
-        })
-        .catch((error) => {
-          console.error("❌ Handler promise rejected:", error);
-          reject(error);
-        });
+    }).catch((err) => {
+      console.error("❌ Handler promise rejected:", err);
     });
+    
+    // Return the promise - Vercel will wait for it
+    return handlerPromise;
   } catch (error) {
     console.error("❌ API handler error:", error);
     console.error("❌ Error stack:", error.stack);
