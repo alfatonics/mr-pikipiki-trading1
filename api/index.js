@@ -190,30 +190,30 @@ export default async function (req, res) {
   // But we need to do it in a way that preserves method and body
   if (targetPath) {
     const pathWithoutQuery = targetPath.split("?")[0];
-    
+
     // Directly modify the URL - this is what Express will see
     // We need to do this before serverless-http processes the request
     const originalMethod = req.method;
-    
+
     // Modify URL directly
     req.url = pathWithoutQuery;
     req.originalUrl = pathWithoutQuery;
     req.path = pathWithoutQuery;
-    
+
     // Clear the path query parameter since we've extracted it
     if (req.query && req.query.path) {
       delete req.query.path;
     }
-    
+
     // Force method to stay as original (serverless-http might change it)
     // We'll set it again right before calling handler
-    Object.defineProperty(req, 'method', {
+    Object.defineProperty(req, "method", {
       value: originalMethod,
       writable: true,
       configurable: true,
-      enumerable: true
+      enumerable: true,
     });
-    
+
     console.log("🔧 Modified req.url to:", req.url, "method:", req.method);
   }
 
@@ -253,20 +253,19 @@ export default async function (req, res) {
       req.method = originalMethod;
       console.log("🔧 Restored method to:", req.method);
     }
-    
-    // Call the serverless-http handler with timeout protection
-    const handlerPromise = handler(req, res);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Handler timeout")), 25000)
-    );
 
-    const result = await Promise.race([handlerPromise, timeoutPromise]);
+    // Call the serverless-http handler
+    // Note: serverless-http returns a promise that resolves when response is sent
+    const result = await handler(req, res);
 
     console.log("✅ API handler completed:", {
       method: req.method,
       path: req.path,
       statusCode: res.statusCode,
+      headersSent: res.headersSent,
     });
+    
+    // Return the result from serverless-http
     return result;
   } catch (error) {
     console.error("❌ API handler error:", error);
