@@ -188,16 +188,44 @@ export default async function (req, res) {
   // Remove query string from path for routing
   const pathWithoutQuery = targetPath.split("?")[0];
 
-  // CRITICAL: Preserve the original HTTP method before modifying req
+  // CRITICAL: Create a new request object with correct properties
+  // Don't modify req directly as serverless-http might re-parse it incorrectly
+  // Instead, we'll modify it in a way that preserves method and body
+  
+  // Store original values
   const originalMethod = req.method;
+  const originalBody = req.body;
   
-  // Update req properties for Express routing BEFORE serverless-http processes it
-  req.url = targetPath;
-  req.originalUrl = targetPath;
-  req.path = pathWithoutQuery;
+  // Update req properties - but do it carefully to preserve method
+  Object.defineProperty(req, 'url', {
+    value: targetPath,
+    writable: true,
+    configurable: true
+  });
+  Object.defineProperty(req, 'originalUrl', {
+    value: targetPath,
+    writable: true,
+    configurable: true
+  });
+  Object.defineProperty(req, 'path', {
+    value: pathWithoutQuery,
+    writable: true,
+    configurable: true
+  });
+  Object.defineProperty(req, 'method', {
+    value: originalMethod,
+    writable: true,
+    configurable: true
+  });
   
-  // Ensure method is preserved (serverless-http might change it)
-  req.method = originalMethod;
+  // Preserve body if it exists
+  if (originalBody) {
+    Object.defineProperty(req, 'body', {
+      value: originalBody,
+      writable: true,
+      configurable: true
+    });
+  }
 
   // Preserve query parameters (except path) if any
   if (originalQuery && Object.keys(originalQuery).length > 0) {
@@ -206,19 +234,19 @@ export default async function (req, res) {
     if (Object.keys(newQuery).length > 0) {
       req.query = newQuery;
     } else {
-      // Clear query if only path was there
       req.query = {};
     }
   } else {
     req.query = {};
   }
-  
+
   console.log("🔧 Request properties after modification:", {
     method: req.method,
     url: req.url,
     path: req.path,
     originalUrl: req.originalUrl,
-    query: req.query
+    query: req.query,
+    hasBody: !!req.body,
   });
 
   console.log("🔔 === ROUTING DECISION ===");
