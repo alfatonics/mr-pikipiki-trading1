@@ -186,35 +186,16 @@ export default async function (req, res) {
     targetPath = `/api${targetPath}`;
   }
 
-  // CRITICAL: Modify req.url to the target path BEFORE serverless-http processes it
-  // But we need to do it in a way that preserves method and body
+  // DON'T modify req.url here - it breaks serverless-http response handling
+  // Instead, pass the target path info to Express middleware via a custom header
+  // Express middleware will handle the path rewriting
   if (targetPath) {
     const pathWithoutQuery = targetPath.split("?")[0];
-
-    // Directly modify the URL - this is what Express will see
-    // We need to do this before serverless-http processes the request
-    const originalMethod = req.method;
-
-    // Modify URL directly
-    req.url = pathWithoutQuery;
-    req.originalUrl = pathWithoutQuery;
-    req.path = pathWithoutQuery;
-
-    // Clear the path query parameter since we've extracted it
-    if (req.query && req.query.path) {
-      delete req.query.path;
-    }
-
-    // Force method to stay as original (serverless-http might change it)
-    // We'll set it again right before calling handler
-    Object.defineProperty(req, "method", {
-      value: originalMethod,
-      writable: true,
-      configurable: true,
-      enumerable: true,
-    });
-
-    console.log("🔧 Modified req.url to:", req.url, "method:", req.method);
+    
+    // Store target path in a custom header for Express middleware
+    req.headers['x-target-path'] = pathWithoutQuery;
+    
+    console.log("🔧 Set target path in header:", pathWithoutQuery);
   }
 
   console.log("🔔 === ROUTING DECISION ===");
@@ -258,18 +239,20 @@ export default async function (req, res) {
     // Important: Don't await - let it handle the response asynchronously
     // But we need to return the promise so Vercel knows the function is still running
     const handlerPromise = handler(req, res);
-    
+
     // Log after a short delay to see if response was sent
-    handlerPromise.then(() => {
-      console.log("✅ Handler promise resolved:", {
-        statusCode: res.statusCode,
-        headersSent: res.headersSent,
-        finished: res.finished,
+    handlerPromise
+      .then(() => {
+        console.log("✅ Handler promise resolved:", {
+          statusCode: res.statusCode,
+          headersSent: res.headersSent,
+          finished: res.finished,
+        });
+      })
+      .catch((err) => {
+        console.error("❌ Handler promise rejected:", err);
       });
-    }).catch((err) => {
-      console.error("❌ Handler promise rejected:", err);
-    });
-    
+
     // Return the promise - Vercel will wait for it
     return handlerPromise;
   } catch (error) {

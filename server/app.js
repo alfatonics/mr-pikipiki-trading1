@@ -66,11 +66,17 @@ app.use(
   })
 );
 // Path rewriting middleware for Vercel rewrites
-// When Vercel rewrites /api/auth/login to /api/index?path=auth/login,
-// we need to extract the path from query parameter and rewrite the URL
+// Handle both query parameter method and custom header method
 app.use((req, res, next) => {
-  // Check if we're at /api/index with a path query parameter (from Vercel rewrite)
-  if (
+  let newPath = null;
+  
+  // Method 1: Check custom header set by api/index.js handler
+  if (req.headers['x-target-path']) {
+    newPath = req.headers['x-target-path'];
+    console.log("🔄 Rewriting path from header:", req.url, "->", newPath);
+  }
+  // Method 2: Check if we're at /api/index with a path query parameter (from Vercel rewrite)
+  else if (
     (req.url === "/api/index" ||
       req.path === "/api/index" ||
       req.url.startsWith("/api/index?")) &&
@@ -80,20 +86,24 @@ app.use((req, res, next) => {
     const pathParam = Array.isArray(req.query.path)
       ? req.query.path.join("/")
       : req.query.path;
-    const newPath = `/api/${pathParam}`;
-
-    console.log("🔄 Rewriting path:", req.url, "->", newPath);
-
+    newPath = `/api/${pathParam}`;
+    console.log("🔄 Rewriting path from query:", req.url, "->", newPath);
+  }
+  
+  if (newPath) {
     // Rewrite the URL
     req.url = newPath;
     req.originalUrl = newPath;
     req.path = newPath;
 
-    // Remove path from query
-    const newQuery = { ...req.query };
-    delete newQuery.path;
-    req.query = newQuery;
+    // Remove path from query if it exists
+    if (req.query && req.query.path) {
+      const newQuery = { ...req.query };
+      delete newQuery.path;
+      req.query = newQuery;
+    }
   }
+  
   next();
 });
 
@@ -103,19 +113,27 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   // If method is GET but we have Content-Type and Content-Length indicating a body
   // This is likely a serverless-http bug where it changed POST to GET
-  if (req.method === 'GET') {
-    const contentType = req.headers['content-type'] || '';
-    const contentLength = req.headers['content-length'];
-    
+  if (req.method === "GET") {
+    const contentType = req.headers["content-type"] || "";
+    const contentLength = req.headers["content-length"];
+
     // If we have JSON content type and content length > 0, it's likely a POST
-    if (contentType.includes('application/json') && contentLength && parseInt(contentLength) > 0) {
+    if (
+      contentType.includes("application/json") &&
+      contentLength &&
+      parseInt(contentLength) > 0
+    ) {
       console.log("🔧 Restoring method from GET to POST (has JSON body)");
-      req.method = 'POST';
+      req.method = "POST";
     }
     // Also check for form data
-    else if (contentType.includes('application/x-www-form-urlencoded') && contentLength && parseInt(contentLength) > 0) {
+    else if (
+      contentType.includes("application/x-www-form-urlencoded") &&
+      contentLength &&
+      parseInt(contentLength) > 0
+    ) {
       console.log("🔧 Restoring method from GET to POST (has form body)");
-      req.method = 'POST';
+      req.method = "POST";
     }
   }
   next();
