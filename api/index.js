@@ -12,15 +12,25 @@ const handler = serverless(app, {
 console.log("✅ Serverless handler created");
 
 export default async function (req, res) {
-  // IMMEDIATE TEST: Return simple response to verify function is being called
-  if (req.url === "/api/ping" || req.path === "/api/ping") {
-    return res.json({
-      message: "Function is working!",
-      method: req.method,
-      url: req.url,
-      path: req.path,
-      query: req.query,
-    });
+  try {
+    // IMMEDIATE TEST: Return simple response to verify function is being called
+    // Check both before and after path extraction
+    const checkUrl = req.url || "";
+    const checkPath = req.path || "";
+    
+    if (checkUrl.includes("/ping") || checkPath.includes("/ping") || 
+        checkUrl === "/api/ping" || checkPath === "/api/ping") {
+      return res.json({
+        message: "Function is working!",
+        method: req.method,
+        url: req.url,
+        path: req.path,
+        query: req.query,
+      });
+    }
+  } catch (error) {
+    console.error("❌ Error in ping check:", error);
+    return res.status(500).json({ error: error.message });
   }
 
   // Handle CORS preflight requests
@@ -218,8 +228,14 @@ export default async function (req, res) {
   }
 
   try {
-    // Call the serverless-http handler
-    const result = await handler(req, res);
+    // Call the serverless-http handler with timeout protection
+    const handlerPromise = handler(req, res);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Handler timeout")), 25000)
+    );
+    
+    const result = await Promise.race([handlerPromise, timeoutPromise]);
+    
     console.log("✅ API handler completed:", {
       method: req.method,
       path: req.path,
@@ -228,11 +244,17 @@ export default async function (req, res) {
     return result;
   } catch (error) {
     console.error("❌ API handler error:", error);
+    console.error("❌ Error stack:", error.stack);
     if (!res.headersSent) {
       res
         .status(500)
-        .json({ error: "Internal server error", message: error.message });
+        .json({ 
+          error: "Internal server error", 
+          message: error.message,
+          type: error.name
+        });
     }
-    throw error;
+    // Don't throw - return the error response instead
+    return;
   }
 }
