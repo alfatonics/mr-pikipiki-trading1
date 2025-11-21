@@ -70,19 +70,25 @@ app.use(
 // we need to extract the path from query parameter and rewrite the URL
 app.use((req, res, next) => {
   // Check if we're at /api/index with a path query parameter (from Vercel rewrite)
-  if ((req.url === '/api/index' || req.path === '/api/index' || req.url.startsWith('/api/index?')) && req.query && req.query.path) {
-    const pathParam = Array.isArray(req.query.path) 
-      ? req.query.path.join('/')
+  if (
+    (req.url === "/api/index" ||
+      req.path === "/api/index" ||
+      req.url.startsWith("/api/index?")) &&
+    req.query &&
+    req.query.path
+  ) {
+    const pathParam = Array.isArray(req.query.path)
+      ? req.query.path.join("/")
       : req.query.path;
     const newPath = `/api/${pathParam}`;
-    
-    console.log('🔄 Rewriting path:', req.url, '->', newPath);
-    
+
+    console.log("🔄 Rewriting path:", req.url, "->", newPath);
+
     // Rewrite the URL
     req.url = newPath;
     req.originalUrl = newPath;
     req.path = newPath;
-    
+
     // Remove path from query
     const newQuery = { ...req.query };
     delete newQuery.path;
@@ -91,12 +97,30 @@ app.use((req, res, next) => {
   next();
 });
 
+// CRITICAL: Method preservation middleware
+// serverless-http sometimes changes POST to GET, so we need to preserve it
+// Check if the request has a body but method is GET - likely a serverless-http bug
+app.use((req, res, next) => {
+  // If we have a body and method is GET, check if we should restore it to POST
+  // This happens when serverless-http incorrectly changes the method
+  if (req.method === 'GET' && req.body && Object.keys(req.body).length > 0) {
+    // Check Content-Type header to determine original method
+    const contentType = req.headers['content-type'] || '';
+    if (contentType.includes('application/json') || contentType.includes('application/x-www-form-urlencoded')) {
+      // Likely should be POST
+      console.log("🔧 Restoring method from GET to POST (has body)");
+      req.method = 'POST';
+    }
+  }
+  next();
+});
+
 // Add debug logging middleware AFTER path rewriting
 app.use((req, res, next) => {
-  console.log('🔍 Incoming request:', req.method, req.url);
-  console.log('📍 Original URL:', req.originalUrl);
-  console.log('📍 Path:', req.path);
-  console.log('📍 Base URL:', req.baseUrl);
+  console.log("🔍 Incoming request:", req.method, req.url);
+  console.log("📍 Original URL:", req.originalUrl);
+  console.log("📍 Path:", req.path);
+  console.log("📍 Base URL:", req.baseUrl);
   next();
 });
 
