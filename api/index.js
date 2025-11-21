@@ -17,9 +17,13 @@ export default async function (req, res) {
     // Check both before and after path extraction
     const checkUrl = req.url || "";
     const checkPath = req.path || "";
-    
-    if (checkUrl.includes("/ping") || checkPath.includes("/ping") || 
-        checkUrl === "/api/ping" || checkPath === "/api/ping") {
+
+    if (
+      checkUrl.includes("/ping") ||
+      checkPath.includes("/ping") ||
+      checkUrl === "/api/ping" ||
+      checkPath === "/api/ping"
+    ) {
       return res.json({
         message: "Function is working!",
         method: req.method,
@@ -184,10 +188,16 @@ export default async function (req, res) {
   // Remove query string from path for routing
   const pathWithoutQuery = targetPath.split("?")[0];
 
+  // CRITICAL: Preserve the original HTTP method before modifying req
+  const originalMethod = req.method;
+  
   // Update req properties for Express routing BEFORE serverless-http processes it
   req.url = targetPath;
   req.originalUrl = targetPath;
   req.path = pathWithoutQuery;
+  
+  // Ensure method is preserved (serverless-http might change it)
+  req.method = originalMethod;
 
   // Preserve query parameters (except path) if any
   if (originalQuery && Object.keys(originalQuery).length > 0) {
@@ -195,8 +205,21 @@ export default async function (req, res) {
     delete newQuery.path;
     if (Object.keys(newQuery).length > 0) {
       req.query = newQuery;
+    } else {
+      // Clear query if only path was there
+      req.query = {};
     }
+  } else {
+    req.query = {};
   }
+  
+  console.log("🔧 Request properties after modification:", {
+    method: req.method,
+    url: req.url,
+    path: req.path,
+    originalUrl: req.originalUrl,
+    query: req.query
+  });
 
   console.log("🔔 === ROUTING DECISION ===");
   console.log("🔔 Original URL:", originalUrl);
@@ -230,12 +253,12 @@ export default async function (req, res) {
   try {
     // Call the serverless-http handler with timeout protection
     const handlerPromise = handler(req, res);
-    const timeoutPromise = new Promise((_, reject) => 
+    const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("Handler timeout")), 25000)
     );
-    
+
     const result = await Promise.race([handlerPromise, timeoutPromise]);
-    
+
     console.log("✅ API handler completed:", {
       method: req.method,
       path: req.path,
@@ -246,13 +269,11 @@ export default async function (req, res) {
     console.error("❌ API handler error:", error);
     console.error("❌ Error stack:", error.stack);
     if (!res.headersSent) {
-      res
-        .status(500)
-        .json({ 
-          error: "Internal server error", 
-          message: error.message,
-          type: error.name
-        });
+      res.status(500).json({
+        error: "Internal server error",
+        message: error.message,
+        type: error.name,
+      });
     }
     // Don't throw - return the error response instead
     return;
