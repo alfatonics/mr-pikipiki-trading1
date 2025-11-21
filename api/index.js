@@ -58,6 +58,7 @@ export default async function (req, res) {
   const originalUrl = req.url || "/";
   const originalPath = req.path || "/";
   const originalQuery = req.query || {};
+  const originalMethod = req.method; // Store original method early
 
   // Log all request details for debugging
   console.log("🔍 === VERCEL REQUEST DEBUG ===");
@@ -185,17 +186,36 @@ export default async function (req, res) {
     targetPath = `/api${targetPath}`;
   }
 
-  // Instead of modifying req here, let Express middleware handle it
-  // This preserves the method and body better
-  // Just pass the path info in a way Express can use
-  
-  // If we found a target path different from current, add it to query for Express middleware
-  if (targetPath && targetPath !== originalUrl.split("?")[0]) {
-    // Add the target path to query so Express middleware can rewrite it
-    req.query._targetPath = targetPath.replace('/api/', '');
+  // CRITICAL: Modify req.url to the target path BEFORE serverless-http processes it
+  // But we need to do it in a way that preserves method and body
+  if (targetPath) {
+    const pathWithoutQuery = targetPath.split("?")[0];
+    
+    // Directly modify the URL - this is what Express will see
+    // We need to do this before serverless-http processes the request
+    const originalMethod = req.method;
+    
+    // Modify URL directly
+    req.url = pathWithoutQuery;
+    req.originalUrl = pathWithoutQuery;
+    req.path = pathWithoutQuery;
+    
+    // Clear the path query parameter since we've extracted it
+    if (req.query && req.query.path) {
+      delete req.query.path;
+    }
+    
+    // Force method to stay as original (serverless-http might change it)
+    // We'll set it again right before calling handler
+    Object.defineProperty(req, 'method', {
+      value: originalMethod,
+      writable: true,
+      configurable: true,
+      enumerable: true
+    });
+    
+    console.log("🔧 Modified req.url to:", req.url, "method:", req.method);
   }
-  
-  console.log("🔧 Will let Express middleware handle path rewriting");
 
   console.log("🔔 === ROUTING DECISION ===");
   console.log("🔔 Original URL:", originalUrl);
@@ -227,6 +247,13 @@ export default async function (req, res) {
   }
 
   try {
+    // CRITICAL: Ensure method is preserved right before calling handler
+    // serverless-http might have changed it, so set it again
+    if (req.method !== originalMethod) {
+      req.method = originalMethod;
+      console.log("🔧 Restored method to:", req.method);
+    }
+    
     // Call the serverless-http handler with timeout protection
     const handlerPromise = handler(req, res);
     const timeoutPromise = new Promise((_, reject) =>
