@@ -1,15 +1,6 @@
-import serverless from "serverless-http";
 import app from "../server/app.js";
 
-console.log("🚀 API handler module loaded");
-
-// Wrap Express app with serverless-http
-const handler = serverless(app, {
-  binary: ["image/*", "application/pdf", "application/octet-stream"],
-});
-
-// Log when handler is created
-console.log("✅ Serverless handler created");
+console.log("🚀 API handler module loaded (direct Express mode)");
 
 export default async function (req, res) {
   try {
@@ -191,10 +182,10 @@ export default async function (req, res) {
   // Express middleware will handle the path rewriting
   if (targetPath) {
     const pathWithoutQuery = targetPath.split("?")[0];
-    
+
     // Store target path in a custom header for Express middleware
-    req.headers['x-target-path'] = pathWithoutQuery;
-    
+    req.headers["x-target-path"] = pathWithoutQuery;
+
     console.log("🔧 Set target path in header:", pathWithoutQuery);
   }
 
@@ -228,23 +219,61 @@ export default async function (req, res) {
   }
 
   try {
-    // CRITICAL: Ensure method is preserved right before calling handler
+    // CRITICAL: Ensure method is preserved
     if (req.method !== originalMethod) {
       req.method = originalMethod;
       console.log("🔧 Restored method to:", req.method);
     }
 
-    // Call the serverless-http handler WITHOUT modifying req.url
-    // Express middleware will handle path rewriting to preserve response handling
-    const result = await handler(req, res);
-    
-    console.log("✅ Handler completed:", {
-      statusCode: res.statusCode,
-      headersSent: res.headersSent,
-      finished: res.finished,
+    // CRITICAL: Modify req.url BEFORE passing to Express
+    // This is safe because we're calling Express directly, not through serverless-http
+    if (targetPath) {
+      const pathWithoutQuery = targetPath.split("?")[0];
+      req.url = pathWithoutQuery;
+      req.originalUrl = pathWithoutQuery;
+      req.path = pathWithoutQuery;
+      
+      // Remove path from query
+      if (req.query && req.query.path) {
+        const newQuery = { ...req.query };
+        delete newQuery.path;
+        req.query = newQuery;
+      }
+      
+      console.log("🔧 Modified req.url to:", req.url);
+    }
+
+    // Call Express app directly (no serverless-http wrapper)
+    // This should properly handle response sending
+    return new Promise((resolve, reject) => {
+      // Set up response listeners
+      res.on('finish', () => {
+        console.log("✅ Response finished:", {
+          statusCode: res.statusCode,
+          headersSent: res.headersSent,
+        });
+        resolve();
+      });
+      
+      res.on('close', () => {
+        console.log("✅ Response closed");
+        resolve();
+      });
+      
+      // Call Express app
+      app(req, res, (err) => {
+        if (err) {
+          console.error("❌ Express error:", err);
+          reject(err);
+        } else {
+          // If no error and response wasn't sent, resolve anyway
+          if (!res.headersSent) {
+            console.warn("⚠️ Response not sent by Express");
+          }
+          resolve();
+        }
+      });
     });
-    
-    return result;
   } catch (error) {
     console.error("❌ API handler error:", error);
     console.error("❌ Error stack:", error.stack);
