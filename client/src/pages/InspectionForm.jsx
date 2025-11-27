@@ -140,6 +140,13 @@ const InspectionForm = () => {
   const showGidioniSections =
     canEditGidioniSections || formData.workflowStatus === "completed";
 
+  // Motorcycle selector:
+  // - For GIDIONI (transport) wanapochagua pikipiki kwa mnunuzi
+  // - Au kama hakuna contract kabisa (ukaguzi wa kawaida bila mkataba)
+  // RAMA (registration) hutumia pikipiki inayotoka moja kwa moja kwenye contract,
+  // kwa hiyo hawatakiwi kuchagua pikipiki kwa mkono hapa.
+  const shouldShowMotorcycleSelect = !contractId || user?.role === "transport";
+
   useEffect(() => {
     fetchData();
     if (inspectionId) {
@@ -364,7 +371,13 @@ const InspectionForm = () => {
       }
     } catch (error) {
       console.error("Error saving inspection:", error);
-      alert("Imeshindwa kuhifadhi ukaguzi. Tafadhali jaribu tena.");
+      console.error("Inspection save response:", error.response?.data);
+      const backendMessage =
+        error.response?.data?.error ||
+        error.response?.data?.details ||
+        error.message ||
+        "Unknown error";
+      alert(`Imeshindwa kuhifadhi ukaguzi: ${backendMessage}`);
     } finally {
       setLoading(false);
     }
@@ -638,8 +651,8 @@ const InspectionForm = () => {
         </div>
       </div>
 
-      {/* Form Selection (Hidden when printing) - Only show for GIDIONI or when no contract */}
-      {(!contractId || user?.role === "transport") && (
+      {/* Form Selection (Hidden when printing) */}
+      {shouldShowMotorcycleSelect && (
         <div className="p-4 print:hidden">
           <Card className="mb-4">
             <h3 className="text-lg font-semibold mb-4">Chagua Taarifa</h3>
