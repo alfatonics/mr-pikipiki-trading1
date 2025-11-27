@@ -232,14 +232,14 @@ export default async function (req, res) {
       req.url = pathWithoutQuery;
       req.originalUrl = pathWithoutQuery;
       req.path = pathWithoutQuery;
-      
+
       // Remove path from query
       if (req.query && req.query.path) {
         const newQuery = { ...req.query };
         delete newQuery.path;
         req.query = newQuery;
       }
-      
+
       console.log("🔧 Modified req.url to:", req.url);
     }
 
@@ -247,19 +247,19 @@ export default async function (req, res) {
     // This should properly handle response sending
     return new Promise((resolve, reject) => {
       // Set up response listeners
-      res.on('finish', () => {
+      res.on("finish", () => {
         console.log("✅ Response finished:", {
           statusCode: res.statusCode,
           headersSent: res.headersSent,
         });
         resolve();
       });
-      
-      res.on('close', () => {
+
+      res.on("close", () => {
         console.log("✅ Response closed");
         resolve();
       });
-      
+
       // Call Express app
       app(req, res, (err) => {
         if (err) {

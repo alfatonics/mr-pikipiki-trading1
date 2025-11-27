@@ -49,7 +49,7 @@ router.get("/:id", authenticate, async (req, res) => {
 router.post(
   "/",
   authenticate,
-  authorize("admin", "sales"),
+  authorize("admin", "sales", "secretary"),
   async (req, res) => {
     try {
       const supplier = await Supplier.create(req.body);

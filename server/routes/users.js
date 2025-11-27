@@ -4,11 +4,17 @@ import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Get all users (Admin only)
-router.get("/", authenticate, authorize("admin"), async (req, res) => {
+// Get all users - Admin and Secretary can see all users
+router.get("/", authenticate, async (req, res) => {
   try {
-    const users = await User.findAll();
-    res.json(users);
+    // Admin and secretary can see all users, others see only active users
+    if (req.user.role === "admin" || req.user.role === "secretary") {
+      const users = await User.findAll();
+      res.json(users);
+    } else {
+      const users = await User.findAll({ isActive: true });
+      res.json(users);
+    }
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch users" });
   }

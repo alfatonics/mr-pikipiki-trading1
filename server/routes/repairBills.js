@@ -17,6 +17,12 @@ router.get("/", authenticate, async (req, res) => {
       dateFrom: req.query.dateFrom,
       dateTo: req.query.dateTo,
     };
+
+    // If frontend asks for bills approved by current cashier/user
+    if (req.query.approvedByMe === "true") {
+      filters.paymentApprovedBy = req.user.id;
+    }
+
     const bills = await RepairBill.findAll(filters);
     res.json(bills);
   } catch (error) {
@@ -32,6 +38,22 @@ router.get("/:id", authenticate, async (req, res) => {
     if (!bill) {
       return res.status(404).json({ error: "Repair bill not found" });
     }
+
+    // Get repair details with spare parts
+    if (bill.repairId) {
+      const Repair = (await import("../models/Repair.js")).default;
+      const repair = await Repair.findById(bill.repairId);
+
+      if (repair) {
+        // Get spare parts for this repair
+        const spareParts = await Repair.getSpareParts(bill.repairId);
+        bill.repair = {
+          ...repair,
+          spareParts: spareParts || [],
+        };
+      }
+    }
+
     res.json(bill);
   } catch (error) {
     console.error("Error fetching repair bill:", error);
@@ -106,11 +128,11 @@ router.post(
   }
 );
 
-// Approve bill payment (cashier/admin)
+// Approve bill payment (ADMIN ONLY - required before cashier can pay)
 router.post(
   "/:id/approve",
   authenticate,
-  authorize("cashier", "admin"),
+  authorize("admin"),
   async (req, res) => {
     try {
       const bill = await RepairBill.approvePayment(req.params.id, req.user.id);
@@ -125,11 +147,11 @@ router.post(
   }
 );
 
-// Reject bill
+// Reject bill (ADMIN ONLY)
 router.post(
   "/:id/reject",
   authenticate,
-  authorize("cashier", "admin"),
+  authorize("admin"),
   async (req, res) => {
     try {
       const { reason } = req.body;
@@ -145,6 +167,94 @@ router.post(
     } catch (error) {
       console.error("Error rejecting bill:", error);
       res.status(500).json({ error: "Failed to reject bill" });
+    }
+  }
+);
+
+// Cashier approves payment (after receiving bill)
+router.post(
+  "/:id/approve-payment",
+  authenticate,
+  authorize("cashier", "secretary,cashier", "admin"),
+  async (req, res) => {
+    try {
+      const bill = await RepairBill.findById(req.params.id);
+      if (!bill) {
+        return res.status(404).json({ error: "Repair bill not found" });
+      }
+
+      if (bill.status !== "sent_to_cashier") {
+        return res
+          .status(400)
+          .json({ error: "Bill is not pending cashier approval" });
+      }
+
+      // Update bill status to payment_approved and record who approved
+      await RepairBill.approvePayment(req.params.id, req.user.id);
+
+      // Get repair details to fetch motorcycle info
+      const repair = await Repair.findById(bill.repairId);
+
+      // Import Motorcycle and Message models
+      const Motorcycle = (await import("../models/Motorcycle.js")).default;
+      const Message = (await import("../models/Message.js")).default;
+      const User = (await import("../models/User.js")).default;
+
+      const motorcycle = repair?.motorcycleId
+        ? await Motorcycle.findById(repair.motorcycleId)
+        : null;
+
+      // Calculate total costs
+      const purchasePrice = parseFloat(motorcycle?.purchasePrice || 0);
+      const repairCost = parseFloat(bill.totalAmount || 0);
+      const otherCosts = parseFloat(motorcycle?.otherCosts || 0);
+      const totalCost = purchasePrice + repairCost + otherCosts;
+
+      // Update motorcycle with repair cost and total cost
+      if (motorcycle) {
+        await Motorcycle.update(motorcycle.id, {
+          repairCost: repairCost,
+          totalCost: totalCost,
+          pricingStatus: "pending_pricing",
+        });
+      }
+
+      // Send notification to admin with cost breakdown
+      const admins = await User.findAll({ role: "admin", isActive: true });
+
+      for (const admin of admins) {
+        const motorcycleInfo = motorcycle
+          ? `${motorcycle.brand} ${motorcycle.model} (${motorcycle.chassisNumber})`
+          : "Pikipiki";
+
+        const messageBody = `Cashier amethibitisha malipo ya matengenezo kwa ${motorcycleInfo}.
+
+📊 MUHTASARI WA GHARAMA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Bei ya Manunuzi: TZS ${purchasePrice.toLocaleString()}
+• Gharama za Matengenezo: TZS ${repairCost.toLocaleString()}
+• Gharama Nyingine: TZS ${otherCosts.toLocaleString()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 JUMLA YA GHARAMA: TZS ${totalCost.toLocaleString()}
+
+Tafadhali weka FAIDA (profit margin) ili kupata bei ya mauzo.`;
+
+        await Message.create({
+          senderId: req.user.id,
+          receiverId: admin.id,
+          subject: `Malipo Yamethibitishwa - ${motorcycleInfo}`,
+          message: messageBody,
+          relatedEntityType: "Motorcycle",
+          relatedEntityId: motorcycle?.id || null,
+          priority: "high",
+        });
+      }
+
+      const updatedBill = await RepairBill.findById(req.params.id);
+      res.json(updatedBill);
+    } catch (error) {
+      console.error("Error approving payment:", error);
+      res.status(500).json({ error: "Failed to approve payment" });
     }
   }
 );

@@ -15,7 +15,9 @@ const pool = new Pool({
       : false,
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // How long a client is allowed to remain idle
-  connectionTimeoutMillis: 10000, // How long to wait for a connection
+  connectionTimeoutMillis: 30000, // How long to wait for a connection (increased from 10s to 30s)
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 // Test connection on initialization
@@ -27,18 +29,45 @@ pool.on("error", (err) => {
   console.error("❌ Unexpected PostgreSQL error:", err);
 });
 
-// Helper function to execute queries
-export const query = async (text, params) => {
+// Helper function to execute queries with retry logic
+export const query = async (text, params, retries = 2) => {
   const start = Date.now();
-  try {
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    console.log("Executed query", { text, duration, rows: res.rowCount });
-    return res;
-  } catch (error) {
-    console.error("Database query error:", error);
-    throw error;
+  let lastError;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await pool.query(text, params);
+      const duration = Date.now() - start;
+      console.log("Executed query", { text, duration, rows: res.rowCount });
+      return res;
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `Database query error (attempt ${attempt + 1}/${retries + 1}):`,
+        error.message
+      );
+
+      // If it's a connection error and we have retries left, wait and retry
+      if (
+        attempt < retries &&
+        (error.code === "ECONNRESET" ||
+          error.code === "ETIMEDOUT" ||
+          error.message.includes("Connection terminated") ||
+          error.message.includes("timeout"))
+      ) {
+        const waitTime = (attempt + 1) * 1000; // Exponential backoff: 1s, 2s
+        console.log(`Retrying query in ${waitTime}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      // If it's not a connection error or we're out of retries, throw immediately
+      throw error;
+    }
   }
+
+  // If we exhausted all retries, throw the last error
+  throw lastError;
 };
 
 // Helper function to get a client from the pool for transactions

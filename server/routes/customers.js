@@ -6,11 +6,19 @@ import { query } from "../config/database.js";
 
 const router = express.Router();
 
-// Get all customers
+// Get all customers with purchase statistics
 router.get("/", authenticate, async (req, res) => {
   try {
     console.log("Customers API requested by user:", req.user.username);
-    const customers = await Customer.findAll();
+    const { includeStats, budgetRange, city } = req.query;
+
+    let customers;
+    if (includeStats === "true") {
+      customers = await Customer.findAllWithStats({ budgetRange, city });
+    } else {
+      customers = await Customer.findAll();
+    }
+
     console.log(`Found ${customers.length} customers`);
     res.json(customers);
   } catch (error) {
@@ -28,15 +36,76 @@ router.get("/:id", authenticate, async (req, res) => {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    // Get motorcycles purchased by this customer
-    const motorcycles = await Motorcycle.findAll({ customerId: req.params.id });
+    // Get purchase history from contracts
+    const purchaseHistory = await Customer.getPurchaseHistory(req.params.id);
+
+    // Get purchase statistics
+    const stats = await Customer.getPurchaseStats(req.params.id);
 
     res.json({
       ...customer,
-      purchases: motorcycles,
+      purchaseHistory,
+      stats,
     });
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch customer" });
+  }
+});
+
+// Get customer purchase history
+router.get("/:id/purchases", authenticate, async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+    const purchases = await Customer.getPurchaseHistory(req.params.id, {
+      startDate,
+      endDate,
+      status,
+    });
+    res.json(purchases);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch purchase history" });
+  }
+});
+
+// Get customer purchase statistics
+router.get("/:id/stats", authenticate, async (req, res) => {
+  try {
+    const { period = "all" } = req.query;
+    const stats = await Customer.getPurchaseStats(req.params.id, period);
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch statistics" });
+  }
+});
+
+// Get budget range analysis
+router.get("/analysis/budget-range", authenticate, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const start =
+      startDate ||
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
+    const end = endDate || new Date().toISOString().split("T")[0];
+
+    const analysis = await Customer.getBudgetRangeAnalysis(start, end);
+    res.json(analysis);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch budget range analysis" });
+  }
+});
+
+// Get average purchase by period
+router.get("/analysis/average-purchase", authenticate, async (req, res) => {
+  try {
+    const { period = "week" } = req.query;
+    const analysis = await Customer.getAveragePurchaseByPeriod(period);
+    res.json(analysis);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Failed to fetch average purchase analysis" });
   }
 });
 
@@ -44,7 +113,7 @@ router.get("/:id", authenticate, async (req, res) => {
 router.post(
   "/",
   authenticate,
-  authorize("admin", "sales"),
+  authorize("admin", "sales", "secretary"),
   async (req, res) => {
     try {
       const customer = await Customer.create(req.body);

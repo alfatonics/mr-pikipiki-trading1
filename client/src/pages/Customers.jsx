@@ -1,45 +1,71 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Modal from '../components/Modal';
-import Input from '../components/Input';
-import Select from '../components/Select';
-import TableWithSearch from '../components/TableWithSearch';
-import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+import { useState, useEffect } from "react";
+import axios from "axios";
+import Card from "../components/Card";
+import Button from "../components/Button";
+import Modal from "../components/Modal";
+import Input from "../components/Input";
+import Select from "../components/Select";
+import TableWithSearch from "../components/TableWithSearch";
+import { FiPlus, FiEdit, FiTrash2, FiBarChart2, FiX } from "react-icons/fi";
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [formData, setFormData] = useState({
-    fullName: '',
-    phone: '',
-    email: '',
-    idType: 'NIDA',
-    idNumber: '',
-    address: '',
-    city: 'Dar es Salaam',
-    region: '',
-    occupation: '',
-    notes: '',
+    fullName: "",
+    phone: "",
+    email: "",
+    idType: "NIDA",
+    idNumber: "",
+    address: "",
+    city: "Dar es Salaam",
+    region: "",
+    occupation: "",
+    notes: "",
     // Sales/Pricing Information
-    budgetRange: '',
-    preferredCurrency: 'TZS',
-    creditLimit: '',
-    paymentTerms: 'cash',
-    salesNotes: ''
+    budgetRange: "",
+    preferredCurrency: "TZS",
+    creditLimit: "",
+    paymentTerms: "cash",
+    salesNotes: "",
   });
+
+  const [analysisData, setAnalysisData] = useState(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [analysisPeriod, setAnalysisPeriod] = useState("week");
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+    fetchAnalysis();
+  }, [analysisPeriod]);
 
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get('/api/customers');
-      setCustomers(response.data);
+      const response = await axios.get("/api/customers?includeStats=true");
+      const all = response.data || [];
+      // Show only customers who have at least one contract (come from sale contracts)
+      const fromContracts = all.filter((c) => (c.contractCount || 0) > 0);
+      setCustomers(fromContracts);
     } catch (error) {
+      console.error("Error fetching customers:", error);
+    }
+  };
+
+  const fetchAnalysis = async () => {
+    try {
+      const [avgResponse, budgetResponse] = await Promise.all([
+        axios.get(
+          `/api/customers/analysis/average-purchase?period=${analysisPeriod}`
+        ),
+        axios.get("/api/customers/analysis/budget-range"),
+      ]);
+      setAnalysisData({
+        averagePurchases: avgResponse.data,
+        budgetRanges: budgetResponse.data,
+      });
+    } catch (error) {
+      console.error("Error fetching analysis:", error);
     }
   };
 
@@ -49,22 +75,22 @@ const Customers = () => {
       if (editingCustomer) {
         await axios.put(`/api/customers/${editingCustomer._id}`, formData);
       } else {
-        await axios.post('/api/customers', formData);
+        await axios.post("/api/customers", formData);
       }
       fetchCustomers();
       handleCloseModal();
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to save customer');
+      alert(error.response?.data?.error || "Failed to save customer");
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this customer?')) {
+    if (window.confirm("Are you sure you want to delete this customer?")) {
       try {
         await axios.delete(`/api/customers/${id}`);
         fetchCustomers();
       } catch (error) {
-        alert(error.response?.data?.error || 'Failed to delete customer');
+        alert(error.response?.data?.error || "Failed to delete customer");
       }
     }
   };
@@ -74,14 +100,19 @@ const Customers = () => {
     setFormData({
       fullName: customer.fullName,
       phone: customer.phone,
-      email: customer.email || '',
+      email: customer.email || "",
       idType: customer.idType,
       idNumber: customer.idNumber,
       address: customer.address,
-      city: customer.city || 'Dar es Salaam',
-      region: customer.region || '',
-      occupation: customer.occupation || '',
-      notes: customer.notes || ''
+      city: customer.city || "Dar es Salaam",
+      region: customer.region || "",
+      occupation: customer.occupation || "",
+      notes: customer.notes || "",
+      budgetRange: customer.budgetRange || "",
+      preferredCurrency: customer.preferredCurrency || "TZS",
+      creditLimit: customer.creditLimit || "",
+      paymentTerms: customer.paymentTerms || "cash",
+      salesNotes: customer.salesNotes || "",
     });
     setModalOpen(true);
   };
@@ -90,54 +121,97 @@ const Customers = () => {
     setModalOpen(false);
     setEditingCustomer(null);
     setFormData({
-      fullName: '',
-      phone: '',
-      email: '',
-      idType: 'NIDA',
-      idNumber: '',
-      address: '',
-      city: 'Dar es Salaam',
-      region: '',
-      occupation: '',
-      notes: ''
+      fullName: "",
+      phone: "",
+      email: "",
+      idType: "NIDA",
+      idNumber: "",
+      address: "",
+      city: "Dar es Salaam",
+      region: "",
+      occupation: "",
+      notes: "",
+      budgetRange: "",
+      preferredCurrency: "TZS",
+      creditLimit: "",
+      paymentTerms: "cash",
+      salesNotes: "",
     });
   };
 
   const columns = [
-    { header: 'Full Name', accessor: 'fullName' },
-    { header: 'Phone', accessor: 'phone' },
-    { header: 'Budget Range', 
+    { header: "Full Name", accessor: "fullName" },
+    { header: "Phone", accessor: "phone" },
+    {
+      header: "Budget Range",
       render: (row) => {
         const ranges = {
-          'under-500k': 'Under 500K',
-          '500k-1m': '500K - 1M',
-          '1m-2m': '1M - 2M',
-          '2m-5m': '2M - 5M',
-          '5m-10m': '5M - 10M',
-          'over-10m': 'Over 10M'
+          "under-500k": "Under 500K",
+          "500k-1m": "500K - 1M",
+          "1m-2m": "1M - 2M",
+          "2m-5m": "2M - 5M",
+          "5m-10m": "5M - 10M",
+          "over-10m": "Over 10M",
         };
-        return ranges[row.budgetRange] || 'Not specified';
-      }
+        return ranges[row.budgetRange] || "Not specified";
+      },
     },
-    { header: 'Currency', accessor: 'preferredCurrency' },
-    { header: 'Payment Terms', 
+    { header: "Currency", accessor: "preferredCurrency" },
+    {
+      header: "Payment Terms",
       render: (row) => {
         const terms = {
-          'cash': 'Cash',
-          'installment': 'Installment',
-          'credit': 'Credit',
-          'lease': 'Lease'
+          cash: "Cash",
+          installment: "Installment",
+          credit: "Credit",
+          lease: "Lease",
         };
-        return terms[row.paymentTerms] || 'Cash';
-      }
+        return terms[row.paymentTerms] || "Cash";
+      },
     },
-    { header: 'City', accessor: 'city' },
-    { 
-      header: 'Total Purchases', 
-      render: (row) => row.totalPurchases || 0
+    { header: "City", accessor: "city" },
+    {
+      header: "Total Purchases",
+      render: (row) => row.contractCount || 0,
     },
     {
-      header: 'Actions',
+      header: "Total Amount",
+      render: (row) => {
+        const amount = parseFloat(row.totalPurchaseAmount || 0);
+        return amount > 0
+          ? `TZS ${amount.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`
+          : "TZS 0";
+      },
+    },
+    {
+      header: "Average Purchase",
+      render: (row) => {
+        const avg = parseFloat(row.averagePurchaseAmount || 0);
+        return avg > 0
+          ? `TZS ${avg.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`
+          : "N/A";
+      },
+    },
+    {
+      header: "Last Purchase",
+      render: (row) => {
+        if (!row.lastPurchaseDate) return "Never";
+        const date = new Date(row.lastPurchaseDate);
+        return date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      },
+    },
+    {
+      header: "Actions",
       render: (row) => (
         <div className="flex space-x-2">
           <button
@@ -148,15 +222,15 @@ const Customers = () => {
             <FiEdit className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <button
-            onClick={() => handleDelete(row._id)}
+            onClick={() => handleDelete(row.id || row._id)}
             className="text-red-600 hover:text-red-800 p-1 sm:p-0"
             title="Delete"
           >
             <FiTrash2 className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
-      )
-    }
+      ),
+    },
   ];
 
   return (
@@ -165,23 +239,229 @@ const Customers = () => {
       <div className="bg-white border-b border-gray-200 px-6 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans tracking-tight">Customers</h1>
-            <p className="text-gray-600">Manage customer information and contacts</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans tracking-tight">
+              Customers
+            </h1>
+            <p className="text-gray-600">
+              Manage customer information and contacts
+            </p>
           </div>
-          <Button onClick={() => setModalOpen(true)}>
-            <FiPlus className="inline mr-2" />
-            Add Customer
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowAnalysis(!showAnalysis)}
+            >
+              <FiBarChart2 className="inline mr-2" />
+              {showAnalysis ? "Hide" : "Show"} Analysis
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Analysis Section */}
+      {showAnalysis && analysisData && (
+        <div className="p-4">
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Customer Purchase Analysis</h2>
+              <div className="flex items-center gap-4">
+                <Select
+                  value={analysisPeriod}
+                  onChange={(e) => setAnalysisPeriod(e.target.value)}
+                  options={[
+                    { value: "week", label: "Last Week" },
+                    { value: "month", label: "Last Month" },
+                    { value: "year", label: "Last Year" },
+                  ]}
+                />
+                <button
+                  onClick={() => setShowAnalysis(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <FiX className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Average Purchase Prices */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3">
+                Average Purchase Prices by Period
+              </h3>
+              {analysisData.averagePurchases &&
+              analysisData.averagePurchases.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Period
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Purchases
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Average Price
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Total Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {analysisData.averagePurchases.map((item, idx) => {
+                        const periodDate = new Date(item.period);
+                        const periodLabel =
+                          analysisPeriod === "week"
+                            ? periodDate.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : analysisPeriod === "month"
+                            ? `Week of ${periodDate.toLocaleDateString(
+                                "en-US",
+                                { month: "short", day: "numeric" }
+                              )}`
+                            : periodDate.toLocaleDateString("en-US", {
+                                month: "long",
+                                year: "numeric",
+                              });
+
+                        return (
+                          <tr key={idx}>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm">
+                              {periodLabel}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm">
+                              {item.purchaseCount}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                              TZS{" "}
+                              {parseFloat(item.averageAmount).toLocaleString(
+                                "en-US",
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm">
+                              TZS{" "}
+                              {parseFloat(item.totalAmount).toLocaleString(
+                                "en-US",
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">
+                  No purchase data available for this period.
+                </p>
+              )}
+            </div>
+
+            {/* Budget Range Analysis */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3">
+                Budget Range Distribution
+              </h3>
+              {analysisData.budgetRanges &&
+              analysisData.budgetRanges.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Budget Range
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Customers
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Purchases
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Average Purchase
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Total Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {analysisData.budgetRanges.map((item, idx) => {
+                        const rangeLabels = {
+                          "under-500k": "Under 500K",
+                          "500k-1m": "500K - 1M",
+                          "1m-2m": "1M - 2M",
+                          "2m-5m": "2M - 5M",
+                          "5m-10m": "5M - 10M",
+                          "over-10m": "Over 10M",
+                        };
+
+                        return (
+                          <tr key={idx}>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                              {rangeLabels[item.budgetRange] ||
+                                item.budgetRange}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm">
+                              {item.customerCount}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm">
+                              {item.purchaseCount}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm">
+                              TZS{" "}
+                              {parseFloat(item.averageAmount).toLocaleString(
+                                "en-US",
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm">
+                              TZS{" "}
+                              {parseFloat(item.totalAmount).toLocaleString(
+                                "en-US",
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">
+                  No budget range data available.
+                </p>
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="p-4">
         <Card>
-          <TableWithSearch 
-            columns={columns} 
+          <TableWithSearch
+            columns={columns}
             data={customers}
-            searchKeys={['fullName', 'phone', 'email', 'address', 'idNumber']}
+            searchKeys={["fullName", "phone", "email", "address", "idNumber"]}
           />
         </Card>
       </div>
@@ -189,7 +469,7 @@ const Customers = () => {
       <Modal
         isOpen={modalOpen}
         onClose={handleCloseModal}
-        title={editingCustomer ? 'Edit Customer' : 'Add New Customer'}
+        title={editingCustomer ? "Edit Customer" : "Add New Customer"}
         size="lg"
       >
         <form onSubmit={handleSubmit}>
@@ -197,114 +477,149 @@ const Customers = () => {
             <Input
               label="Full Name"
               value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, fullName: e.target.value })
+              }
               required
             />
             <Input
               label="Phone"
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
               required
             />
             <Input
               label="Email"
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
             />
             <Select
               label="ID Type"
               value={formData.idType}
-              onChange={(e) => setFormData({ ...formData, idType: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, idType: e.target.value })
+              }
               options={[
-                { value: 'NIDA', label: 'NIDA' },
-                { value: 'Passport', label: 'Passport' },
-                { value: 'Driving License', label: 'Driving License' },
-                { value: 'Voter ID', label: 'Voter ID' }
+                { value: "NIDA", label: "NIDA" },
+                { value: "Passport", label: "Passport" },
+                { value: "Driving License", label: "Driving License" },
+                { value: "Voter ID", label: "Voter ID" },
               ]}
               required
             />
             <Input
               label="ID Number"
               value={formData.idNumber}
-              onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, idNumber: e.target.value })
+              }
               required
             />
             <Input
               label="Address"
               value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, address: e.target.value })
+              }
               required
             />
             <Input
               label="City"
               value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, city: e.target.value })
+              }
             />
             <Input
               label="Region"
               value={formData.region}
-              onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, region: e.target.value })
+              }
             />
             <Input
               label="Occupation"
               value={formData.occupation}
-              onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, occupation: e.target.value })
+              }
             />
           </div>
 
           {/* Sales/Pricing Information Section */}
           <div className="mt-6 border-t pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales & Pricing Information</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Sales & Pricing Information
+            </h3>
             <div className="grid grid-cols-2 gap-4">
               <Select
                 label="Budget Range"
                 value={formData.budgetRange}
-                onChange={(e) => setFormData({ ...formData, budgetRange: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, budgetRange: e.target.value })
+                }
                 options={[
-                  { value: '', label: 'Select budget range...' },
-                  { value: 'under-500k', label: 'Under 500,000 TZS' },
-                  { value: '500k-1m', label: '500,000 - 1,000,000 TZS' },
-                  { value: '1m-2m', label: '1,000,000 - 2,000,000 TZS' },
-                  { value: '2m-5m', label: '2,000,000 - 5,000,000 TZS' },
-                  { value: '5m-10m', label: '5,000,000 - 10,000,000 TZS' },
-                  { value: 'over-10m', label: 'Over 10,000,000 TZS' }
+                  { value: "", label: "Select budget range..." },
+                  { value: "under-500k", label: "Under 500,000 TZS" },
+                  { value: "500k-1m", label: "500,000 - 1,000,000 TZS" },
+                  { value: "1m-2m", label: "1,000,000 - 2,000,000 TZS" },
+                  { value: "2m-5m", label: "2,000,000 - 5,000,000 TZS" },
+                  { value: "5m-10m", label: "5,000,000 - 10,000,000 TZS" },
+                  { value: "over-10m", label: "Over 10,000,000 TZS" },
                 ]}
               />
               <Select
                 label="Preferred Currency"
                 value={formData.preferredCurrency}
-                onChange={(e) => setFormData({ ...formData, preferredCurrency: e.target.value })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    preferredCurrency: e.target.value,
+                  })
+                }
                 options={[
-                  { value: 'TZS', label: 'Tanzanian Shilling (TZS)' },
-                  { value: 'USD', label: 'US Dollar (USD)' },
-                  { value: 'EUR', label: 'Euro (EUR)' }
+                  { value: "TZS", label: "Tanzanian Shilling (TZS)" },
+                  { value: "USD", label: "US Dollar (USD)" },
+                  { value: "EUR", label: "Euro (EUR)" },
                 ]}
               />
               <Input
                 label="Credit Limit (TZS)"
                 type="number"
                 value={formData.creditLimit}
-                onChange={(e) => setFormData({ ...formData, creditLimit: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, creditLimit: e.target.value })
+                }
                 placeholder="Enter credit limit amount"
               />
               <Select
                 label="Payment Terms"
                 value={formData.paymentTerms}
-                onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, paymentTerms: e.target.value })
+                }
                 options={[
-                  { value: 'cash', label: 'Cash Payment' },
-                  { value: 'installment', label: 'Installment Plan' },
-                  { value: 'credit', label: 'Credit Account' },
-                  { value: 'lease', label: 'Lease Agreement' }
+                  { value: "cash", label: "Cash Payment" },
+                  { value: "installment", label: "Installment Plan" },
+                  { value: "credit", label: "Credit Account" },
+                  { value: "lease", label: "Lease Agreement" },
                 ]}
               />
             </div>
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sales Notes</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sales Notes
+              </label>
               <textarea
                 value={formData.salesNotes}
-                onChange={(e) => setFormData({ ...formData, salesNotes: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, salesNotes: e.target.value })
+                }
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 rows="3"
                 placeholder="Additional sales information, preferences, or special requirements..."
@@ -313,21 +628,29 @@ const Customers = () => {
           </div>
 
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">General Notes</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              General Notes
+            </label>
             <textarea
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, notes: e.target.value })
+              }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               rows="3"
               placeholder="General customer notes and information..."
             />
           </div>
           <div className="mt-6 flex justify-end space-x-3">
-            <Button type="button" variant="secondary" onClick={handleCloseModal}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleCloseModal}
+            >
               Cancel
             </Button>
             <Button type="submit">
-              {editingCustomer ? 'Update' : 'Create'}
+              {editingCustomer ? "Update" : "Create"}
             </Button>
           </div>
         </form>
@@ -337,5 +660,3 @@ const Customers = () => {
 };
 
 export default Customers;
-
-

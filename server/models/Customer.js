@@ -152,6 +152,200 @@ class Customer {
     const result = await query(sql);
     return parseInt(result.rows[0].count);
   }
+
+  // Get customer purchase history from sale contracts
+  static async getPurchaseHistory(customerId, filters = {}) {
+    let sql = `
+      SELECT 
+        c.id as "contractId",
+        c.contract_number as "contractNumber",
+        c.type,
+        c.amount,
+        c.currency,
+        c.date,
+        c.status,
+        c.payment_method as "paymentMethod",
+        m.brand,
+        m.model,
+        m.chassis_number as "chassisNumber"
+      FROM contracts c
+      LEFT JOIN motorcycles m ON c.motorcycle_id = m.id
+      WHERE c.party_id = $1 
+        AND c.party_model = 'Customer'
+        AND c.type = 'sale'
+    `;
+
+    const params = [customerId];
+    let paramCount = 2;
+
+    if (filters.startDate) {
+      sql += ` AND c.date >= $${paramCount}`;
+      params.push(filters.startDate);
+      paramCount++;
+    }
+
+    if (filters.endDate) {
+      sql += ` AND c.date <= $${paramCount}`;
+      params.push(filters.endDate);
+      paramCount++;
+    }
+
+    if (filters.status) {
+      sql += ` AND c.status = $${paramCount}`;
+      params.push(filters.status);
+      paramCount++;
+    }
+
+    sql += " ORDER BY c.date DESC";
+
+    const result = await query(sql, params);
+    return result.rows;
+  }
+
+  // Get purchase statistics for a customer
+  static async getPurchaseStats(customerId, period = "all") {
+    let dateFilter = "";
+    const params = [customerId];
+
+    if (period === "week") {
+      dateFilter = " AND c.date >= CURRENT_DATE - INTERVAL '7 days'";
+    } else if (period === "month") {
+      dateFilter = " AND c.date >= CURRENT_DATE - INTERVAL '30 days'";
+    } else if (period === "year") {
+      dateFilter = " AND c.date >= CURRENT_DATE - INTERVAL '365 days'";
+    }
+
+    const sql = `
+      SELECT 
+        COUNT(*) as "totalPurchases",
+        COALESCE(SUM(c.amount), 0) as "totalAmount",
+        COALESCE(AVG(c.amount), 0) as "averageAmount",
+        COALESCE(MIN(c.amount), 0) as "minAmount",
+        COALESCE(MAX(c.amount), 0) as "maxAmount"
+      FROM contracts c
+      WHERE c.party_id = $1 
+        AND c.party_model = 'Customer'
+        AND c.type = 'sale'
+        AND c.status IN ('active', 'completed')
+        ${dateFilter}
+    `;
+
+    const result = await query(sql, params);
+    return result.rows[0];
+  }
+
+  // Get all customers with their purchase statistics
+  static async findAllWithStats(filters = {}) {
+    let sql = `
+      SELECT 
+        c.id,
+        c.full_name as "fullName",
+        c.phone,
+        c.email,
+        c.budget_range as "budgetRange",
+        c.preferred_currency as "preferredCurrency",
+        c.payment_terms as "paymentTerms",
+        c.city,
+        c.total_purchases as "totalPurchases",
+        COUNT(ct.id) as "contractCount",
+        COALESCE(SUM(CASE WHEN ct.type = 'sale' AND ct.status IN ('active', 'completed') THEN ct.amount ELSE 0 END), 0) as "totalPurchaseAmount",
+        COALESCE(AVG(CASE WHEN ct.type = 'sale' AND ct.status IN ('active', 'completed') THEN ct.amount ELSE NULL END), 0) as "averagePurchaseAmount",
+        MAX(CASE WHEN ct.type = 'sale' AND ct.status IN ('active', 'completed') THEN ct.date ELSE NULL END) as "lastPurchaseDate"
+      FROM customers c
+      LEFT JOIN contracts ct ON ct.party_id = c.id AND ct.party_model = 'Customer' AND ct.type = 'sale'
+      WHERE 1=1
+    `;
+
+    const params = [];
+    let paramCount = 1;
+
+    if (filters.budgetRange) {
+      sql += ` AND c.budget_range = $${paramCount}`;
+      params.push(filters.budgetRange);
+      paramCount++;
+    }
+
+    if (filters.city) {
+      sql += ` AND c.city = $${paramCount}`;
+      params.push(filters.city);
+      paramCount++;
+    }
+
+    sql += ` GROUP BY c.id, c.full_name, c.phone, c.email, c.budget_range, c.preferred_currency, c.payment_terms, c.city, c.total_purchases
+             ORDER BY c.created_at DESC`;
+
+    const result = await query(sql, params);
+    return result.rows;
+  }
+
+  // Get budget range analysis for a time period
+  static async getBudgetRangeAnalysis(startDate, endDate) {
+    const sql = `
+      SELECT 
+        c.budget_range as "budgetRange",
+        COUNT(DISTINCT c.id) as "customerCount",
+        COUNT(ct.id) as "purchaseCount",
+        COALESCE(SUM(ct.amount), 0) as "totalAmount",
+        COALESCE(AVG(ct.amount), 0) as "averageAmount"
+      FROM customers c
+      LEFT JOIN contracts ct ON ct.party_id = c.id 
+        AND ct.party_model = 'Customer' 
+        AND ct.type = 'sale'
+        AND ct.status IN ('active', 'completed')
+        AND ct.date >= $1
+        AND ct.date <= $2
+      WHERE c.budget_range IS NOT NULL
+      GROUP BY c.budget_range
+      ORDER BY 
+        CASE c.budget_range
+          WHEN 'under-500k' THEN 1
+          WHEN '500k-1m' THEN 2
+          WHEN '1m-2m' THEN 3
+          WHEN '2m-5m' THEN 4
+          WHEN '5m-10m' THEN 5
+          WHEN 'over-10m' THEN 6
+          ELSE 7
+        END
+    `;
+
+    const result = await query(sql, [startDate, endDate]);
+    return result.rows;
+  }
+
+  // Get average purchase price by period (week/month/year)
+  static async getAveragePurchaseByPeriod(period = "week") {
+    let dateFilter = "";
+    let groupBy = "";
+
+    if (period === "week") {
+      dateFilter = "WHERE ct.date >= CURRENT_DATE - INTERVAL '7 days'";
+      groupBy = "DATE_TRUNC('day', ct.date::timestamp)";
+    } else if (period === "month") {
+      dateFilter = "WHERE ct.date >= CURRENT_DATE - INTERVAL '30 days'";
+      groupBy = "DATE_TRUNC('week', ct.date::timestamp)";
+    } else if (period === "year") {
+      dateFilter = "WHERE ct.date >= CURRENT_DATE - INTERVAL '365 days'";
+      groupBy = "DATE_TRUNC('month', ct.date::timestamp)";
+    }
+
+    const sql = `
+      SELECT 
+        ${groupBy} as "period",
+        COUNT(*) as "purchaseCount",
+        COALESCE(AVG(ct.amount), 0) as "averageAmount",
+        COALESCE(SUM(ct.amount), 0) as "totalAmount"
+      FROM contracts ct
+      ${dateFilter}
+        AND ct.type = 'sale'
+        AND ct.status IN ('active', 'completed')
+        AND ct.party_model = 'Customer'
+      GROUP BY ${groupBy}
+      ORDER BY ${groupBy} DESC
+    `;
+
+    const result = await query(sql);
+    return result.rows;
+  }
 }
 
 export default Customer;

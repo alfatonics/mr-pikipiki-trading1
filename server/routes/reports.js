@@ -14,6 +14,7 @@ const router = express.Router();
 router.get("/sales", authenticate, async (req, res) => {
   try {
     const { startDate, endDate, format = "json" } = req.query;
+    const isSecretary = req.user.role === "secretary";
 
     let sql = `
       SELECT m.*, 
@@ -45,23 +46,36 @@ router.get("/sales", authenticate, async (req, res) => {
       (sum, bike) => sum + (parseFloat(bike.selling_price) || 0),
       0
     );
-    const totalProfit = sales.reduce(
-      (sum, bike) =>
-        sum +
-        ((parseFloat(bike.selling_price) || 0) -
-          (parseFloat(bike.purchase_price) || 0)),
-      0
-    );
 
-    res.json({
-      sales,
-      summary: {
-        total: sales.length,
-        totalRevenue,
-        totalProfit,
-        averageProfit: sales.length > 0 ? totalProfit / sales.length : 0,
-      },
-    });
+    // Secretary should NOT see profit data
+    if (isSecretary) {
+      res.json({
+        sales,
+        summary: {
+          total: sales.length,
+          totalRevenue,
+          // No profit data for secretary
+        },
+      });
+    } else {
+      const totalProfit = sales.reduce(
+        (sum, bike) =>
+          sum +
+          ((parseFloat(bike.selling_price) || 0) -
+            (parseFloat(bike.purchase_price) || 0)),
+        0
+      );
+
+      res.json({
+        sales,
+        summary: {
+          total: sales.length,
+          totalRevenue,
+          totalProfit,
+          averageProfit: sales.length > 0 ? totalProfit / sales.length : 0,
+        },
+      });
+    }
   } catch (error) {
     console.error("Sales report error:", error);
     res.status(500).json({ error: "Failed to generate sales report" });

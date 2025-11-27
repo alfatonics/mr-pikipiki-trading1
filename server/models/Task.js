@@ -103,8 +103,10 @@ class Task {
     let paramCount = 1;
 
     if (filters.assignedTo) {
-      sql += ` AND t.assigned_to = $${paramCount++}`;
+      // Handle both UUID and string formats
+      sql += ` AND t.assigned_to::text = $${paramCount}::text`;
       params.push(filters.assignedTo);
+      paramCount++;
     }
 
     if (filters.assignedBy) {
@@ -188,17 +190,6 @@ class Task {
     return result.rows[0] ? this.transformRow(result.rows[0]) : null;
   }
 
-  static async updateStatusByRepairId(repairId, status) {
-    const sql = `
-      UPDATE tasks
-      SET status = $1, updated_at = CURRENT_TIMESTAMP
-      WHERE repair_id = $2
-      RETURNING *
-    `;
-    const result = await query(sql, [status, repairId]);
-    return result.rows.map((row) => this.transformRow(row));
-  }
-
   static async count(filters = {}) {
     let sql = `SELECT COUNT(*) as count FROM tasks WHERE 1=1`;
     const params = [];
@@ -226,14 +217,16 @@ class Task {
     };
 
     const newTaskStatus = taskStatusMap[status];
-    if (!newTaskStatus) return;
+    if (!newTaskStatus) return [];
 
     const sql = `
       UPDATE tasks
       SET status = $1, updated_at = CURRENT_TIMESTAMP
       WHERE repair_id = $2
+      RETURNING *
     `;
-    await query(sql, [newTaskStatus, repairId]);
+    const result = await query(sql, [newTaskStatus, repairId]);
+    return result.rows.map((row) => this.transformRow(row));
   }
 
   static transformRow(row) {

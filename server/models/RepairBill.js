@@ -115,6 +115,12 @@ class RepairBill {
       params.push(filters.status);
     }
 
+    // Bills approved by a specific cashier/user
+    if (filters.paymentApprovedBy) {
+      sql += ` AND rb.payment_approved_by = $${paramCount++}`;
+      params.push(filters.paymentApprovedBy);
+    }
+
     if (filters.repairId) {
       sql += ` AND rb.repair_id = $${paramCount++}`;
       params.push(filters.repairId);

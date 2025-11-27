@@ -9,8 +9,39 @@ export const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (jwtError) {
+      if (jwtError.name === "TokenExpiredError") {
+        return res
+          .status(401)
+          .json({ error: "Token expired. Please login again." });
+      }
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    // Try to fetch user with retry logic for database connection issues
+    let user;
+    try {
+      user = await User.findById(decoded.id);
+    } catch (dbError) {
+      console.error("Database error during authentication:", dbError);
+      // If it's a connection error, return a more helpful message
+      if (
+        dbError.code === "ECONNRESET" ||
+        dbError.code === "ETIMEDOUT" ||
+        dbError.message.includes("Connection terminated") ||
+        dbError.message.includes("timeout")
+      ) {
+        return res.status(503).json({
+          error: "Database connection issue. Please try again.",
+        });
+      }
+      return res
+        .status(500)
+        .json({ error: "Server error during authentication" });
+    }
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: "Invalid authentication" });
@@ -19,7 +50,8 @@ export const authenticate = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ error: "Invalid token" });
+    console.error("Authentication error:", error);
+    return res.status(401).json({ error: "Authentication failed" });
   }
 };
 
@@ -29,7 +61,16 @@ export const authorize = (...roles) => {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    if (!roles.includes(req.user.role) && req.user.role !== "admin") {
+    // Admin always has access
+    if (req.user.role === "admin") {
+      return next();
+    }
+
+    // Handle multi-role users (e.g., "secretary,cashier")
+    const userRoles = req.user.role?.split(",") || [req.user.role];
+    const hasPermission = roles.some((role) => userRoles.includes(role));
+
+    if (!hasPermission) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
 

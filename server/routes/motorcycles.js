@@ -40,22 +40,39 @@ router.get("/:id", authenticate, async (req, res) => {
   }
 });
 
-// Create new motorcycle
+// Create new motorcycle - Can be created by admin or through contract flow (secretary/sales)
+// Motorcycles should normally come from contract → inspection flow
 router.post(
   "/",
   authenticate,
-  authorize("admin", "sales"),
+  authorize("admin", "secretary", "sales"),
   async (req, res) => {
     try {
       const motorcycle = await Motorcycle.create(req.body);
       const populated = await Motorcycle.findById(motorcycle.id);
       res.status(201).json(populated);
     } catch (error) {
+      console.error("Error creating motorcycle:", error);
       if (error.code === "23505") {
         // PostgreSQL unique violation
         return res.status(400).json({ error: "Chassis number already exists" });
       }
-      res.status(500).json({ error: "Failed to create motorcycle" });
+      if (error.code === "23502") {
+        // PostgreSQL not null violation
+        return res.status(400).json({
+          error: `Missing required field: ${error.column || "supplier_id"}`,
+        });
+      }
+      if (error.code === "23503") {
+        // PostgreSQL foreign key violation
+        return res.status(400).json({
+          error: "Invalid supplier_id or reference violation",
+        });
+      }
+      res.status(500).json({
+        error: "Failed to create motorcycle",
+        details: error.message,
+      });
     }
   }
 );

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../context/AuthContext";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
@@ -21,12 +22,15 @@ import {
   FiPrinter,
   FiSearch,
   FiCheck,
+  FiDollarSign,
 } from "react-icons/fi";
 import DocumentPreview from "../components/DocumentPreview";
 import DocumentManager from "../components/DocumentManager";
 import PDFViewer from "../components/PDFViewer";
 
 const Contracts = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [contracts, setContracts] = useState([]);
@@ -37,8 +41,14 @@ const Contracts = () => {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const [documentManagerOpen, setDocumentManagerOpen] = useState(false);
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState(null);
   const [previewDocument, setPreviewDocument] = useState(null);
+  const [approvalData, setApprovalData] = useState({
+    priceIn: "",
+    priceOut: "",
+    profit: "",
+  });
   const [motorcycles, setMotorcycles] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -97,12 +107,21 @@ const Contracts = () => {
         })
       );
 
-      const contractsData = Array.isArray(response.data.contracts)
-        ? response.data.contracts
-        : [];
+      // Handle both response formats: direct array or wrapped in contracts property
+      let contractsData = [];
+      if (Array.isArray(response.data)) {
+        contractsData = response.data;
+      } else if (Array.isArray(response.data.contracts)) {
+        contractsData = response.data.contracts;
+      } else if (response.data && typeof response.data === "object") {
+        // If it's an object but not an array, try to extract contracts
+        contractsData = [];
+      }
+
       setContracts(contractsData);
       setError(null);
     } catch (error) {
+      console.error("Error fetching contracts:", error);
       setError(
         "Failed to load contracts. Please check your connection and try again."
       );
@@ -553,10 +572,47 @@ const Contracts = () => {
           >
             <FiCheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
+          {isAdmin && row.type === "purchase" && row.status !== "completed" && (
+            <button
+              onClick={() => {
+                setSelectedContract(row);
+                setApprovalData({
+                  priceIn: "",
+                  priceOut: row.amount || "",
+                  profit: "",
+                });
+                setApproveModalOpen(true);
+              }}
+              className="p-1 sm:p-0 text-emerald-600 hover:text-emerald-800 transition-colors"
+              title="Approve & Create Motorcycle in Stock"
+            >
+              <FiDollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          )}
         </div>
       ),
     },
   ];
+
+  const handleApproveContract = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(
+        `/api/contracts/${selectedContract._id}/approve-and-create-motorcycle`,
+        approvalData
+      );
+      setApproveModalOpen(false);
+      setSelectedContract(null);
+      setApprovalData({ priceIn: "", priceOut: "", profit: "" });
+      fetchContracts();
+      alert("Contract approved and motorcycle created in stock successfully!");
+    } catch (error) {
+      alert(
+        error.response?.data?.error ||
+          "Failed to approve contract. Please check all inspections and payments are completed."
+      );
+    }
+  };
 
   if (loading) {
     return (
@@ -1037,6 +1093,94 @@ const Contracts = () => {
           setSelectedContract(null);
         }}
       />
+
+      {/* Admin Approval Modal */}
+      <Modal
+        isOpen={approveModalOpen}
+        onClose={() => {
+          setApproveModalOpen(false);
+          setSelectedContract(null);
+          setApprovalData({ priceIn: "", priceOut: "", profit: "" });
+        }}
+        title="Approve Contract & Create Motorcycle in Stock"
+        size="lg"
+      >
+        <form onSubmit={handleApproveContract} className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-800">
+              <strong>Note:</strong> Before approving, ensure:
+            </p>
+            <ul className="text-sm text-blue-700 mt-2 list-disc list-inside space-y-1">
+              <li>Rama inspection is verified</li>
+              <li>Gidi inspection is completed</li>
+              <li>All repairs are completed</li>
+              <li>All repair bills are paid</li>
+            </ul>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Price In (Purchase + Repairs + Extras)"
+              type="number"
+              value={approvalData.priceIn}
+              onChange={(e) => {
+                const priceIn = parseFloat(e.target.value) || 0;
+                const priceOut = parseFloat(approvalData.priceOut) || 0;
+                setApprovalData({
+                  ...approvalData,
+                  priceIn: e.target.value,
+                  profit: priceOut > 0 ? (priceOut - priceIn).toFixed(2) : "",
+                });
+              }}
+              placeholder="Auto-calculated if empty"
+            />
+            <Input
+              label="Price Out (Selling Price)"
+              type="number"
+              value={approvalData.priceOut}
+              onChange={(e) => {
+                const priceOut = parseFloat(e.target.value) || 0;
+                const priceIn = parseFloat(approvalData.priceIn) || 0;
+                setApprovalData({
+                  ...approvalData,
+                  priceOut: e.target.value,
+                  profit: priceIn > 0 ? (priceOut - priceIn).toFixed(2) : "",
+                });
+              }}
+              required
+            />
+            <Input
+              label="Profit (Auto-calculated)"
+              type="number"
+              value={approvalData.profit}
+              onChange={(e) =>
+                setApprovalData({ ...approvalData, profit: e.target.value })
+              }
+              disabled
+              className="bg-gray-100"
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setApproveModalOpen(false);
+                setSelectedContract(null);
+                setApprovalData({ priceIn: "", priceOut: "", profit: "" });
+              }}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="w-full sm:w-auto">
+              <FiCheckCircle className="inline mr-2" />
+              Approve & Create Motorcycle
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

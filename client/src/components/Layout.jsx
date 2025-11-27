@@ -22,6 +22,7 @@ import {
   FiCalendar,
   FiFolder,
   FiBox,
+  FiAlertCircle,
 } from "react-icons/fi";
 import { useState, useEffect } from "react";
 import ModernSidebar from "./ModernSidebar";
@@ -73,7 +74,7 @@ const Layout = () => {
       path: "/tasks",
       icon: FiCheckCircle,
       label: "Tasks",
-      roles: ["transport", "admin"],
+      roles: ["transport", "admin", "registration"],
     },
     {
       path: "/contracts",
@@ -129,7 +130,25 @@ const Layout = () => {
       path: "/cashier",
       icon: FiDollarSign,
       label: "Cashier & Finance",
+      roles: ["admin", "cashier", "secretary,cashier", "sales"],
+    },
+    {
+      path: "/pricing-approval",
+      icon: FiDollarSign,
+      label: "Pricing Approval",
+      roles: ["admin"],
+    },
+    {
+      path: "/loans",
+      icon: FiDollarSign,
+      label: "Loans & Debts",
       roles: ["admin", "cashier", "sales"],
+    },
+    {
+      path: "/bike-for-inspection",
+      icon: FiAlertCircle,
+      label: "Bike for Inspection",
+      roles: ["registration", "admin"],
     },
     {
       path: "/notifications",
@@ -176,9 +195,23 @@ const Layout = () => {
     { path: "/users", icon: FiSettings, label: "Users", roles: ["admin"] },
   ];
 
-  const filteredMenuItems = menuItems.filter(
-    (item) => item.roles.includes("all") || item.roles.includes(user?.role)
-  );
+  const filteredMenuItems = menuItems.filter((item) => {
+    if (item.roles.includes("all")) return true;
+
+    // Handle multi-role users (e.g., "secretary,cashier")
+    const userRoles = user?.role?.split(",").map((r) => r.trim()) || [];
+
+    // Check if any of the user's roles match any of the item's required roles
+    const hasAccess = item.roles.some((requiredRole) => {
+      // Check if user has exact role match
+      if (userRoles.includes(requiredRole)) return true;
+      // Check if user's full role string matches
+      if (user?.role === requiredRole) return true;
+      return false;
+    });
+
+    return hasAccess;
+  });
 
   const handleLogout = () => {
     logout();

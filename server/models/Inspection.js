@@ -25,7 +25,9 @@ class Inspection {
       broughtBy,
       originLocation,
       brokerNumber,
+      inspectionType,
       status = "pending",
+      workflowStatus = "rama_pending",
       overallResult,
       notes,
     } = data;
@@ -38,9 +40,9 @@ class Inspection {
         seller_phone, seller_passport_image, seller_id_type, seller_id_number,
         seller_phone_called, seller_account_access, seller_account_password,
         seller_otp_phone, brought_by, origin_location, broker_number,
-        status, overall_result, notes
+        inspection_type, status, workflow_status, overall_result, notes
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
       RETURNING id, motorcycle_id as "motorcycleId", contract_id as "contractId", 
                 customer_id as "customerId", inspection_date as "inspectionDate",
                 staff_name as "staffName", staff_signature as "staffSignature",
@@ -55,36 +57,40 @@ class Inspection {
                 seller_account_password as "sellerAccountPassword",
                 seller_otp_phone as "sellerOtpPhone",
                 brought_by as "broughtBy", origin_location as "originLocation",
-                broker_number as "brokerNumber", status, overall_result as "overallResult",
+                broker_number as "brokerNumber", inspection_type as "inspectionType",
+                status, overall_result as "overallResult",
                 notes, created_at as "createdAt", updated_at as "updatedAt"
     `;
 
+    // Ensure all values are properly set, handle null/undefined
     const result = await query(sql, [
-      motorcycleId,
-      contractId,
-      customerId,
-      inspectionDate,
-      staffName,
-      staffSignature,
-      mechanicName,
-      mechanicSignature,
-      JSON.stringify(externalAppearance),
-      JSON.stringify(electricalSystem),
-      JSON.stringify(engineSystem),
-      sellerPhone,
-      sellerPassportImage,
-      sellerIdType,
-      sellerIdNumber,
-      sellerPhoneCalled,
-      sellerAccountAccess,
-      sellerAccountPassword,
-      sellerOtpPhone,
-      broughtBy,
-      originLocation,
-      brokerNumber,
-      status,
-      overallResult,
-      notes,
+      motorcycleId || null,
+      contractId || null,
+      customerId || null, // Can be null for purchase contracts
+      inspectionDate || new Date().toISOString().split("T")[0],
+      staffName || null,
+      staffSignature || null,
+      mechanicName || null,
+      mechanicSignature || null,
+      JSON.stringify(externalAppearance || {}),
+      JSON.stringify(electricalSystem || {}),
+      JSON.stringify(engineSystem || {}),
+      sellerPhone || null,
+      sellerPassportImage || null,
+      sellerIdType || null,
+      sellerIdNumber || null,
+      sellerPhoneCalled || false,
+      sellerAccountAccess || null,
+      sellerAccountPassword || null,
+      sellerOtpPhone || null,
+      broughtBy || null,
+      originLocation || null,
+      brokerNumber || null,
+      inspectionType || null,
+      status || "pending",
+      workflowStatus || "rama_pending",
+      overallResult || null,
+      notes || null,
     ]);
 
     // Parse JSONB fields
@@ -112,8 +118,17 @@ class Inspection {
   }
 
   static async findById(id) {
+    // Check if workflow_status column exists, if not use default
     const sql = `
-      SELECT i.*, 
+      SELECT i.id, i.motorcycle_id, i.contract_id, i.customer_id, i.inspection_date,
+             i.staff_name, i.staff_signature, i.mechanic_name, i.mechanic_signature,
+             i.external_appearance, i.electrical_system, i.engine_system,
+             i.seller_phone, i.seller_passport_image, i.seller_id_type, i.seller_id_number,
+             i.seller_phone_called, i.seller_account_access, i.seller_account_password,
+             i.seller_otp_phone, i.brought_by, i.origin_location, i.broker_number,
+             i.inspection_type, i.status, 
+             COALESCE(i.workflow_status, 'rama_pending') as "workflowStatus",
+             i.overall_result, i.notes, i.created_at, i.updated_at,
              m.chassis_number as "motorcycleChassisNumber",
              m.engine_number as "motorcycleEngineNumber",
              m.brand as "motorcycleBrand",
@@ -136,23 +151,44 @@ class Inspection {
     if (result.rows[0]) {
       const row = result.rows[0];
       // Parse JSONB fields
+      let externalAppearance = {};
+      let electricalSystem = {};
+      let engineSystem = {};
+
       if (row.external_appearance) {
-        row.externalAppearance =
-          typeof row.external_appearance === "string"
-            ? JSON.parse(row.external_appearance)
-            : row.external_appearance;
+        try {
+          externalAppearance =
+            typeof row.external_appearance === "string"
+              ? JSON.parse(row.external_appearance)
+              : row.external_appearance;
+        } catch (e) {
+          console.error("Error parsing external_appearance:", e);
+          externalAppearance = {};
+        }
       }
+
       if (row.electrical_system) {
-        row.electricalSystem =
-          typeof row.electrical_system === "string"
-            ? JSON.parse(row.electrical_system)
-            : row.electrical_system;
+        try {
+          electricalSystem =
+            typeof row.electrical_system === "string"
+              ? JSON.parse(row.electrical_system)
+              : row.electrical_system;
+        } catch (e) {
+          console.error("Error parsing electrical_system:", e);
+          electricalSystem = {};
+        }
       }
+
       if (row.engine_system) {
-        row.engineSystem =
-          typeof row.engine_system === "string"
-            ? JSON.parse(row.engine_system)
-            : row.engine_system;
+        try {
+          engineSystem =
+            typeof row.engine_system === "string"
+              ? JSON.parse(row.engine_system)
+              : row.engine_system;
+        } catch (e) {
+          console.error("Error parsing engine_system:", e);
+          engineSystem = {};
+        }
       }
       return {
         id: row.id,
@@ -164,21 +200,24 @@ class Inspection {
         staffSignature: row.staff_signature,
         mechanicName: row.mechanic_name,
         mechanicSignature: row.mechanic_signature,
-        externalAppearance: row.externalAppearance || {},
-        electricalSystem: row.electricalSystem || {},
-        engineSystem: row.engineSystem || {},
+        externalAppearance: externalAppearance,
+        electricalSystem: electricalSystem,
+        engineSystem: engineSystem,
         sellerPhone: row.seller_phone,
         sellerPassportImage: row.seller_passport_image,
         sellerIdType: row.seller_id_type,
         sellerIdNumber: row.seller_id_number,
-        sellerPhoneCalled: row.seller_phone_called,
+        sellerPhoneCalled: row.seller_phone_called || false,
         sellerAccountAccess: row.seller_account_access,
         sellerAccountPassword: row.seller_account_password,
         sellerOtpPhone: row.seller_otp_phone,
         broughtBy: row.brought_by,
         originLocation: row.origin_location,
         brokerNumber: row.broker_number,
+        inspectionType: row.inspection_type,
         status: row.status,
+        workflowStatus:
+          row.workflowStatus || row.workflow_status || "rama_pending",
         overallResult: row.overall_result,
         notes: row.notes,
         createdAt: row.created_at,
@@ -211,7 +250,8 @@ class Inspection {
       SELECT i.id, i.motorcycle_id as "motorcycleId", i.contract_id as "contractId",
              i.customer_id as "customerId", i.inspection_date as "inspectionDate",
              i.staff_name as "staffName", i.mechanic_name as "mechanicName",
-             i.status, i.overall_result as "overallResult",
+             i.status, COALESCE(i.workflow_status, 'rama_pending') as "workflowStatus", 
+             i.overall_result as "overallResult",
              i.created_at as "createdAt", i.updated_at as "updatedAt",
              m.chassis_number as "motorcycleChassisNumber",
              m.brand as "motorcycleBrand",
@@ -241,6 +281,13 @@ class Inspection {
     if (filters.status) {
       sql += ` AND i.status = $${paramCount}`;
       params.push(filters.status);
+      paramCount++;
+    }
+
+    if (filters.workflowStatus) {
+      // Check if workflow_status column exists before filtering
+      sql += ` AND COALESCE(i.workflow_status, 'rama_pending') = $${paramCount}`;
+      params.push(filters.workflowStatus);
       paramCount++;
     }
 
@@ -274,7 +321,9 @@ class Inspection {
       broughtBy: "brought_by",
       originLocation: "origin_location",
       brokerNumber: "broker_number",
+      inspectionType: "inspection_type",
       status: "status",
+      workflowStatus: "workflow_status",
       overallResult: "overall_result",
       notes: "notes",
     };
@@ -306,7 +355,10 @@ class Inspection {
       UPDATE inspections
       SET ${fields.join(", ")}
       WHERE id = $${paramCount}
-      RETURNING id, status, overall_result as "overallResult", updated_at as "updatedAt"
+      RETURNING id, motorcycle_id as "motorcycleId", contract_id as "contractId",
+                customer_id as "customerId", inspection_date as "inspectionDate",
+                status, COALESCE(workflow_status, 'rama_pending') as "workflowStatus",
+                overall_result as "overallResult", updated_at as "updatedAt"
     `;
 
     const result = await query(sql, values);
@@ -335,5 +387,3 @@ class Inspection {
 }
 
 export default Inspection;
-
-

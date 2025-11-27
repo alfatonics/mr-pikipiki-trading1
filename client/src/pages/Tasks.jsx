@@ -34,7 +34,7 @@ const Tasks = () => {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [motorcycles, setMotorcycles] = useState([]);
-  const [mechanics, setMechanics] = useState([]);
+  const [users, setUsers] = useState([]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -58,12 +58,36 @@ const Tasks = () => {
 
   const fetchDropdownData = async () => {
     try {
-      const [motorcyclesRes, mechanicsRes] = await Promise.all([
+      const [motorcyclesRes, usersRes] = await Promise.all([
         axios.get("/api/motorcycles"),
-        axios.get("/api/users/by-role/mechanic"),
+        axios.get("/api/users"),
       ]);
       setMotorcycles(motorcyclesRes.data || []);
-      setMechanics(mechanicsRes.data || []);
+
+      // Admin can assign to anyone
+      if (user?.role === "admin") {
+        setUsers(usersRes.data || []);
+      } else if (user?.role === "secretary") {
+        // Secretary can assign to: rama (registration), gidi (transport), shedrack (sales), cashier, and everyone
+        const allowedRoles = [
+          "registration",
+          "transport",
+          "sales",
+          "cashier",
+          "mechanic",
+          "staff",
+        ];
+        setUsers(
+          usersRes.data.filter(
+            (u) => allowedRoles.includes(u.role) || u.role === "admin"
+          ) || []
+        );
+      } else if (user?.role === "registration") {
+        // Rama (registration) can assign to others
+        setUsers(usersRes.data || []);
+      } else {
+        setUsers([]);
+      }
     } catch (error) {
       console.error("Failed to load dropdown data", error);
     }
@@ -76,10 +100,17 @@ const Tasks = () => {
       if (filter !== "all") {
         params.status = filter;
       }
+      // Registration role (Rama) and Transport role (GIDIONI) should see tasks assigned to them
+      if (user?.role === "registration" || user?.role === "transport") {
+        params.assignedTo = user.id;
+        console.log("Fetching tasks for user:", user.id, "Role:", user.role);
+      }
       const res = await axios.get("/api/tasks", { params });
+      console.log("Tasks fetched:", res.data?.length || 0, "tasks");
       setTasks(res.data || []);
     } catch (error) {
       console.error("Failed to fetch tasks", error);
+      console.error("Error details:", error.response?.data);
     } finally {
       setLoading(false);
     }
@@ -135,7 +166,67 @@ const Tasks = () => {
     setViewModalOpen(true);
   };
 
-  const columns = [
+  const isTransport = user?.role === "transport";
+
+  // Simple, focused view for GIDIONI (transport) – only important fields + open inspection
+  const transportColumns = [
+    {
+      header: "#",
+      render: (_row, index) => index + 1,
+    },
+    {
+      header: "Task ID",
+      accessor: "taskNumber",
+    },
+    {
+      header: "Bike",
+      render: (row) => (
+        <div>
+          <p className="font-semibold">
+            {row.motorcycle?.brand} {row.motorcycle?.model}
+          </p>
+          <p className="text-xs text-gray-500">
+            {row.motorcycle?.chassisNumber}
+          </p>
+        </div>
+      ),
+    },
+    {
+      header: "Tatizo",
+      render: (row) => row.problemDescription || row.description,
+    },
+    {
+      header: "Status",
+      render: (row) => {
+        const badge = statusBadges[row.status] || statusBadges.pending;
+        return (
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}
+          >
+            {badge.label}
+          </span>
+        );
+      },
+    },
+    {
+      header: "Ukaguzi",
+      render: (row) =>
+        row.inspectionId ? (
+          <a
+            href={`/inspection-form?id=${row.inspectionId}`}
+            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700"
+          >
+            <FiEdit className="mr-1" />
+            Fungua Ukaguzi
+          </a>
+        ) : (
+          "-"
+        ),
+    },
+  ];
+
+  // Default rich view for admin/secretary
+  const defaultColumns = [
     {
       header: "Task ID",
       accessor: "taskNumber",
@@ -194,7 +285,19 @@ const Tasks = () => {
           >
             <FiEye />
           </button>
-          {(user?.role === "admin" || user?.role === "transport") && (
+          {/* Link to inspection form if task has inspectionId */}
+          {row.inspectionId && (
+            <a
+              href={`/inspection-form?id=${row.inspectionId}`}
+              className="text-purple-600 hover:text-purple-800"
+              title="Fungua Ukaguzi"
+            >
+              <FiEdit />
+            </a>
+          )}
+          {(user?.role === "admin" ||
+            user?.role === "secretary" ||
+            row.assignedTo === user?.id) && (
             <button
               className="text-green-600 hover:text-green-800"
               title="Mark in progress"
@@ -203,7 +306,9 @@ const Tasks = () => {
               <FiClock />
             </button>
           )}
-          {(user?.role === "admin" || user?.role === "transport") && (
+          {(user?.role === "admin" ||
+            user?.role === "secretary" ||
+            row.assignedTo === user?.id) && (
             <button
               className="text-emerald-600 hover:text-emerald-800"
               title="Mark complete"
@@ -217,6 +322,8 @@ const Tasks = () => {
     },
   ];
 
+  const columns = isTransport ? transportColumns : defaultColumns;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-6 py-6">
@@ -229,7 +336,7 @@ const Tasks = () => {
               Kazi zinazopelekwa na Gidion kwenda kwa fundi Dito
             </p>
           </div>
-          {(user?.role === "admin" || user?.role === "transport") && (
+          {(user?.role === "admin" || user?.role === "secretary") && (
             <Button onClick={() => setAssignModalOpen(true)}>
               <FiPlus className="inline mr-2" />
               Assign Task
@@ -331,10 +438,10 @@ const Tasks = () => {
               setFormData({ ...formData, assignedTo: e.target.value })
             }
             options={[
-              { value: "", label: "Select mechanic" },
-              ...mechanics.map((mech) => ({
-                value: mech.id,
-                label: mech.fullName || mech.username,
+              { value: "", label: "Select person" },
+              ...users.map((u) => ({
+                value: u.id,
+                label: `${u.fullName || u.username} (${u.role})`,
               })),
             ]}
             required
@@ -457,6 +564,18 @@ const Tasks = () => {
             <p>
               <strong>Notes:</strong> {selectedTask.notes || "None"}
             </p>
+            {/* Link to inspection form if task has inspectionId */}
+            {selectedTask.inspectionId && (
+              <div className="mt-4 pt-4 border-t">
+                <a
+                  href={`/inspection-form?id=${selectedTask.inspectionId}`}
+                  className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                >
+                  <FiEdit className="mr-2" />
+                  Fungua Ukaguzi
+                </a>
+              </div>
+            )}
           </div>
         )}
       </Modal>
@@ -465,5 +584,3 @@ const Tasks = () => {
 };
 
 export default Tasks;
-
-

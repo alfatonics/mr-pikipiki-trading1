@@ -81,8 +81,17 @@ axios.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      sessionStorage.removeItem("token");
+      // Only remove token if it's not a login request
+      if (!error.config?.url?.includes("/auth/login")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("user");
+        // Redirect to login if not already there
+        if (!window.location.pathname.includes("/login")) {
+          window.location.href = "/login";
+        }
+      }
     }
 
     return Promise.reject(error);

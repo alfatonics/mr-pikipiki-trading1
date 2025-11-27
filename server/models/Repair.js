@@ -5,6 +5,7 @@ class Repair {
     const {
       motorcycleId,
       mechanicId,
+      inspectionId,
       description,
       repairType,
       startDate = new Date(),
@@ -22,12 +23,12 @@ class Repair {
     } = data;
 
     const sql = `
-      INSERT INTO repairs (motorcycle_id, mechanic_id, description, repair_type, start_date,
+      INSERT INTO repairs (motorcycle_id, mechanic_id, inspection_id, description, repair_type, start_date,
                           completion_date, status, labor_cost, labor_hours, total_cost, notes,
                           details_registered, details_approval_id, work_description, issues_found, recommendations)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-      RETURNING id, motorcycle_id as "motorcycleId", mechanic_id as "mechanicId", description,
-                repair_type as "repairType", start_date as "startDate", completion_date as "completionDate",
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      RETURNING id, motorcycle_id as "motorcycleId", mechanic_id as "mechanicId", inspection_id as "inspectionId",
+                description, repair_type as "repairType", start_date as "startDate", completion_date as "completionDate",
                 status, labor_cost as "laborCost", labor_hours as "laborHours", total_cost as "totalCost",
                 notes, details_registered as "detailsRegistered", details_approval_id as "detailsApprovalId",
                 work_description as "workDescription", issues_found as "issuesFound", recommendations,
@@ -37,6 +38,7 @@ class Repair {
     const result = await query(sql, [
       motorcycleId,
       mechanicId,
+      inspectionId || null,
       description,
       repairType,
       startDate,
@@ -73,6 +75,7 @@ class Repair {
         id: row.id,
         motorcycleId: row.motorcycle_id,
         mechanicId: row.mechanic_id,
+        inspectionId: row.inspection_id,
         description: row.description,
         repairType: row.repair_type,
         startDate: row.start_date,
@@ -99,11 +102,12 @@ class Repair {
   static async findAll(filters = {}) {
     let sql = `
       SELECT r.id, r.motorcycle_id as "motorcycleId", r.mechanic_id as "mechanicId",
-             r.description, r.repair_type as "repairType", r.start_date as "startDate",
-             r.completion_date as "completionDate", r.status, r.labor_cost as "laborCost",
-             r.labor_hours as "laborHours", r.total_cost as "totalCost",
-             r.created_at as "createdAt", r.updated_at as "updatedAt",
-             m.chassis_number as "motorcycleChassisNumber",
+             r.inspection_id as "inspectionId", r.description, r.repair_type as "repairType", 
+             r.start_date as "startDate", r.completion_date as "completionDate", r.status, 
+             r.labor_cost as "laborCost", r.labor_hours as "laborHours", r.total_cost as "totalCost",
+             r.notes, r.created_at as "createdAt", r.updated_at as "updatedAt",
+             m.chassis_number as "motorcycleChassisNumber", m.brand as "motorcycleBrand",
+             m.model as "motorcycleModel",
              u.full_name as "mechanicName"
       FROM repairs r
       LEFT JOIN motorcycles m ON r.motorcycle_id = m.id

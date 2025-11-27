@@ -18,9 +18,15 @@ class FinanceTransaction {
       proofDocument,
       department,
       createdBy,
-      status = "completed",
+      status,
       notes,
     } = data;
+
+    // Cash_in transactions can be completed directly, cash_out requires approval
+    const finalStatus =
+      transactionType === "cash_in"
+        ? status || "completed"
+        : status || "pending";
 
     const sql = `
       INSERT INTO finance_transactions (
@@ -54,10 +60,49 @@ class FinanceTransaction {
       proofDocument,
       department,
       createdBy,
-      status,
+      finalStatus,
       notes,
     ]);
     return result.rows[0];
+  }
+
+  static async approve(id, approvedBy) {
+    const sql = `
+      UPDATE finance_transactions
+      SET status = 'approved',
+          approved_by = $1,
+          approved_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `;
+    const result = await query(sql, [approvedBy, id]);
+    if (result.rows[0]) {
+      return await this.findById(id);
+    }
+    return null;
+  }
+
+  static async reject(id, rejectedBy, reason) {
+    const sql = `
+      UPDATE finance_transactions
+      SET status = 'rejected',
+          approved_by = $1,
+          approved_at = CURRENT_TIMESTAMP,
+          notes = COALESCE(notes || E'\\n', '') || 'Rejection reason: ' || $3,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `;
+    const result = await query(sql, [
+      rejectedBy,
+      id,
+      reason || "No reason provided",
+    ]);
+    if (result.rows[0]) {
+      return await this.findById(id);
+    }
+    return null;
   }
 
   static async findById(id) {
@@ -117,6 +162,10 @@ class FinanceTransaction {
   }
 
   static async findAll(filters = {}) {
+    // Add status filter if not provided
+    if (!filters.status && filters.transactionType === "cash_out") {
+      // For cash_out, show all statuses by default
+    }
     let sql = `
       SELECT t.id, t.transaction_type as "transactionType", t.category, t.amount, t.currency,
              t.description, t.date, t.status, t.department,
@@ -166,6 +215,12 @@ class FinanceTransaction {
     if (filters.department) {
       sql += ` AND t.department = $${paramCount}`;
       params.push(filters.department);
+      paramCount++;
+    }
+
+    if (filters.status) {
+      sql += ` AND t.status = $${paramCount}`;
+      params.push(filters.status);
       paramCount++;
     }
 
@@ -327,5 +382,3 @@ class FinanceTransaction {
 }
 
 export default FinanceTransaction;
-
-

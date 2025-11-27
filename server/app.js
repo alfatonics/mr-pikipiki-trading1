@@ -24,6 +24,8 @@ import attendanceRoutes from "./routes/attendance.js";
 import documentRoutes from "./routes/documents.js";
 import officeSupplyRoutes from "./routes/officeSupplies.js";
 import staffTaskRoutes from "./routes/staffTasks.js";
+import loanRoutes from "./routes/loans.js";
+import ownershipTransferRoutes from "./routes/ownershipTransfers.js";
 
 dotenv.config();
 
@@ -152,8 +154,9 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase body parser limits to handle large payloads (e.g., base64 images)
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Serve uploaded files
 import path from "path";
@@ -218,6 +221,10 @@ app.use("/api/office-supplies", officeSupplyRoutes);
 console.log("✅ Office supplies routes registered");
 app.use("/api/staff-tasks", staffTaskRoutes);
 console.log("✅ Staff tasks routes registered");
+app.use("/api/loans", loanRoutes);
+console.log("✅ Loans routes registered");
+app.use("/api/ownership-transfers", ownershipTransferRoutes);
+console.log("✅ Ownership transfer routes registered");
 console.log("🎯 All API routes registered successfully");
 
 // Health check
@@ -302,8 +309,25 @@ app.use("*", (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  console.error("Error:", err.message);
   console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!" });
+
+  // Handle payload too large errors
+  if (
+    err.type === "entity.too.large" ||
+    err.message?.includes("entity too large")
+  ) {
+    return res.status(413).json({
+      error:
+        "Request payload too large. Please reduce image sizes or remove unnecessary data.",
+      limit: "50MB",
+    });
+  }
+
+  res.status(500).json({
+    error: "Something went wrong!",
+    details: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
 });
 
 export default app;

@@ -74,7 +74,7 @@ const Dashboard = () => {
       setError(null);
 
       const statsRes = await axios.get("/api/dashboard/stats", {
-        timeout: 30000, // 30 second timeout to match axios default
+        timeout: 95000, // 95 second timeout for dashboard stats (increased due to complex queries)
       });
 
       // Use the data directly from the API
@@ -709,9 +709,49 @@ const TransportDashboard = ({ stats }) => {
 
 // Registration Dashboard
 const RegistrationDashboard = ({ stats }) => {
+  const [inspectionStats, setInspectionStats] = useState({
+    pending: 0,
+    completed: 0,
+  });
+
+  useEffect(() => {
+    // Fetch inspection stats for RAMA
+    const fetchInspectionStats = async () => {
+      try {
+        const response = await axios.get("/api/inspections", {
+          params: { workflowStatus: "rama_pending" },
+        });
+        const completedResponse = await axios.get("/api/inspections", {
+          params: { workflowStatus: "rama_completed" },
+        });
+        setInspectionStats({
+          pending: response.data?.length || 0,
+          completed: completedResponse.data?.length || 0,
+        });
+      } catch (error) {
+        console.error("Error fetching inspection stats:", error);
+      }
+    };
+    fetchInspectionStats();
+  }, []);
+
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+        <StatCard
+          title="Ukaguzi Inasubiri"
+          value={inspectionStats.pending}
+          icon={FiAlertCircle}
+          color="warning"
+          subtitle="RAMA: Inasubiri ukaguzi"
+        />
+        <StatCard
+          title="Ukaguzi Umekamilika"
+          value={inspectionStats.completed}
+          icon={FiCheckCircle}
+          color="success"
+          subtitle="RAMA: Zimekamilika"
+        />
         <StatCard
           title="Total Motorcycles"
           value={stats?.motorcycles?.total || 0}
@@ -723,34 +763,94 @@ const RegistrationDashboard = ({ stats }) => {
           title="In Stock"
           value={stats?.motorcycles?.inStock || 0}
           icon={FiCheckCircle}
-          color="success"
-          subtitle="Ready/Registered"
-        />
-        <StatCard
-          title="Sold"
-          value={stats?.motorcycles?.sold || 0}
-          icon={FiTrendingUp}
           color="info"
-          subtitle="Total sold"
+          subtitle="Ready/Registered"
         />
       </div>
 
-      <Card>
-        <h2 className="text-xl font-semibold mb-4">Quick Access</h2>
-        <a
-          href="/motorcycles"
-          className="block p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-primary-900">Manage Motorcycles</p>
-              <p className="text-sm text-primary-700">
-                Registration & documentation
-              </p>
-            </div>
-            <FiPackage className="text-primary-600 text-2xl" />
+      {/* Info Card */}
+      <Card className="mb-6 bg-blue-50 border-blue-200">
+        <div className="flex items-start space-x-3">
+          <FiAlertCircle className="text-blue-600 text-xl mt-1 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-base text-blue-900 mb-2">
+              RAMA Dashboard - Ukaguzi wa Usalama
+            </h3>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Kukagua taarifa za muuzaji (Sehemu D) - USALAMA</li>
+              <li>• Kuthibitisha kitambulisho, simu, na account ya muuzaji</li>
+              <li>• Baada ya kukamilika, ukaguzi unaenda kwa GIDIONI</li>
+              <li>• GIDIONI atakagua ubora na matengenezo (Sehemu A-C)</li>
+            </ul>
           </div>
-        </a>
+        </div>
+      </Card>
+
+      {/* Quick Actions */}
+      <Card className="mb-6">
+        <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <a
+            href="/bike-for-inspection"
+            className="block p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition border border-yellow-200"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-yellow-900">
+                  Pikipiki za Ukaguzi
+                </p>
+                <p className="text-sm text-yellow-700">
+                  Angalia pikipiki zinazosubiri ukaguzi wa RAMA
+                </p>
+              </div>
+              <FiAlertCircle className="text-yellow-600 text-2xl" />
+            </div>
+          </a>
+          <a
+            href="/contracts?type=purchase"
+            className="block p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition border border-primary-200"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-primary-900">
+                  Mikataba ya Ununuzi
+                </p>
+                <p className="text-sm text-primary-700">
+                  Tazama taarifa za mikataba ya ununuzi
+                </p>
+              </div>
+              <FiFileText className="text-primary-600 text-2xl" />
+            </div>
+          </a>
+          <a
+            href="/inspection-form"
+            className="block p-4 bg-green-50 rounded-lg hover:bg-green-100 transition border border-green-200"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-green-900">Fomu ya Ukaguzi</p>
+                <p className="text-sm text-green-700">
+                  Anza ukaguzi mpya wa pikipiki
+                </p>
+              </div>
+              <FiCheckCircle className="text-green-600 text-2xl" />
+            </div>
+          </a>
+          <a
+            href="/motorcycles"
+            className="block p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition border border-blue-200"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-blue-900">Manage Motorcycles</p>
+                <p className="text-sm text-blue-700">
+                  Registration & documentation
+                </p>
+              </div>
+              <FiPackage className="text-blue-600 text-2xl" />
+            </div>
+          </a>
+        </div>
       </Card>
     </>
   );

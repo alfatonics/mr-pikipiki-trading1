@@ -57,10 +57,43 @@ router.get("/debug", async (req, res) => {
 // Get dashboard statistics
 router.get("/stats", authenticate, async (req, res) => {
   const startTime = Date.now();
+  // Set a timeout for the entire request (90 seconds to allow for complex queries)
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.error("Dashboard stats request timed out after 90 seconds");
+      res.status(504).json({
+        error: "Request timeout",
+        message:
+          "Dashboard statistics request took too long. The database may be slow or under heavy load. Please try again.",
+      });
+    }
+  }, 90000);
+
   try {
     console.log("Dashboard stats requested by user:", req.user.username);
 
     // Run all independent count queries in parallel for better performance
+    // Wrap each in a catch to prevent one failure from breaking all
+    const countQueries = await Promise.allSettled([
+      Motorcycle.count(),
+      Motorcycle.count({ status: "in_stock" }),
+      Motorcycle.count({ status: "sold" }),
+      Motorcycle.count({ status: "in_repair" }),
+      Motorcycle.count({ status: "in_transit" }),
+      Motorcycle.count({ status: "reserved" }),
+      Supplier.count(),
+      Supplier.count({ isActive: true }),
+      Customer.count(),
+      Contract.count(),
+      Contract.count({ status: "active" }),
+      Transport.count(),
+      Transport.count({ status: "pending" }),
+      Repair.count(),
+      Repair.count({ status: "pending" }),
+      Repair.count({ status: "in_progress" }),
+    ]);
+
+    // Extract values from settled promises, defaulting to 0 on failure
     const [
       totalMotorcycles,
       inStock,
@@ -78,30 +111,43 @@ router.get("/stats", authenticate, async (req, res) => {
       totalRepairs,
       pendingRepairs,
       inProgressRepairs,
-      recentMotorcyclesAll,
-    ] = await Promise.all([
-      Motorcycle.count(),
-      Motorcycle.count({ status: "in_stock" }),
-      Motorcycle.count({ status: "sold" }),
-      Motorcycle.count({ status: "in_repair" }),
-      Motorcycle.count({ status: "in_transit" }),
-      Motorcycle.count({ status: "reserved" }),
-      Supplier.count(),
-      Supplier.count({ isActive: true }),
-      Customer.count(),
-      Contract.count(),
-      Contract.count({ status: "active" }),
-      Transport.count(),
-      Transport.count({ status: "pending" }),
-      Repair.count(),
-      Repair.count({ status: "pending" }),
-      Repair.count({ status: "in_progress" }),
-      Motorcycle.findAll(),
-    ]);
+    ] = countQueries.map((result, index) => {
+      if (result.status === "fulfilled") {
+        return result.value;
+      } else {
+        console.error(`Count query ${index} failed:`, result.reason);
+        return 0;
+      }
+    });
 
-    const recent = Array.isArray(recentMotorcyclesAll)
-      ? recentMotorcyclesAll.slice(0, 5)
-      : [];
+    // Fetch only recent motorcycles (limit to 5) instead of all motorcycles
+    // This is much more efficient and prevents timeout on large datasets
+    let recent = [];
+    try {
+      const recentMotorcyclesQuery = `
+        SELECT m.id, m.chassis_number as "chassisNumber", m.engine_number as "engineNumber", 
+               m.brand, m.model, m.year, m.color,
+               m.purchase_price as "purchasePrice", m.selling_price as "sellingPrice", 
+               m.supplier_id as "supplierId", m.purchase_date as "purchaseDate", 
+               m.status, m.customer_id as "customerId", m.sale_date as "saleDate",
+               m.registration_number as "registrationNumber", m.notes,
+               m.maintenance_cost as "maintenanceCost", m.total_cost as "totalCost",
+               m.price_in as "priceIn", m.price_out as "priceOut", m.profit,
+               m.created_at as "createdAt", m.updated_at as "updatedAt",
+               s.name as "supplierName",
+               c.full_name as "customerName"
+        FROM motorcycles m
+        LEFT JOIN suppliers s ON m.supplier_id = s.id
+        LEFT JOIN customers c ON m.customer_id = c.id
+        ORDER BY m.created_at DESC
+        LIMIT 5
+      `;
+      const recentResult = await query(recentMotorcyclesQuery);
+      recent = recentResult.rows || [];
+    } catch (err) {
+      console.warn("Error fetching recent motorcycles:", err.message);
+      recent = [];
+    }
 
     // Get monthly sales data
     const now = new Date();
@@ -110,21 +156,28 @@ router.get("/stats", authenticate, async (req, res) => {
     const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
+    // Optimize date queries using date ranges instead of EXTRACT (much faster with indexes)
+    const monthStart = new Date(currentYear, currentMonth - 1, 1);
+    const monthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999);
+    const lastMonthStart = new Date(lastMonthYear, lastMonth - 1, 1);
+    const lastMonthEnd = new Date(lastMonthYear, lastMonth, 0, 23, 59, 59, 999);
+
     // Run all SQL queries in parallel for better performance
+    // Using date ranges instead of EXTRACT for better index usage
     const monthlySalesQuery = `
       SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as revenue
       FROM contracts
       WHERE type = 'sale' 
-        AND EXTRACT(MONTH FROM date) = $1 
-        AND EXTRACT(YEAR FROM date) = $2
+        AND date >= $1 
+        AND date <= $2
         AND status = 'active'
     `;
     const monthlyPurchasesQuery = `
       SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as expense
       FROM contracts
       WHERE type = 'purchase' 
-        AND EXTRACT(MONTH FROM date) = $1 
-        AND EXTRACT(YEAR FROM date) = $2
+        AND date >= $1 
+        AND date <= $2
         AND status = 'active'
     `;
     const topSuppliersQuery = `
@@ -150,11 +203,73 @@ router.get("/stats", authenticate, async (req, res) => {
       SELECT COALESCE(SUM(total_cost), 0) as total
       FROM repairs
       WHERE status = 'completed'
-        AND EXTRACT(MONTH FROM completion_date) = $1
-        AND EXTRACT(YEAR FROM completion_date) = $2
+        AND completion_date >= $1
+        AND completion_date <= $2
     `;
 
-    // Run all independent SQL queries in parallel
+    // Helper function to add timeout to queries
+    const queryWithTimeout = (
+      queryPromise,
+      timeoutMs = 10000,
+      queryName = "query"
+    ) => {
+      return Promise.race([
+        queryPromise,
+        new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(new Error(`${queryName} timed out after ${timeoutMs}ms`)),
+            timeoutMs
+          )
+        ),
+      ]).catch((err) => {
+        console.warn(`${queryName} failed or timed out:`, err.message);
+        throw err;
+      });
+    };
+
+    // Run critical SQL queries with timeouts
+    // Non-critical queries (topSuppliers, recentSales) are optional and can fail gracefully
+    const sqlQueries = await Promise.allSettled([
+      queryWithTimeout(
+        query(monthlySalesQuery, [monthStart, monthEnd]),
+        15000,
+        "monthlySales"
+      ),
+      queryWithTimeout(
+        query(monthlySalesQuery, [lastMonthStart, lastMonthEnd]),
+        15000,
+        "lastMonthSales"
+      ),
+      queryWithTimeout(
+        query(monthlyPurchasesQuery, [monthStart, monthEnd]),
+        15000,
+        "monthlyPurchases"
+      ),
+      queryWithTimeout(query(topSuppliersQuery), 20000, "topSuppliers").catch(
+        () => ({ rows: [] })
+      ),
+      queryWithTimeout(query(recentSalesQuery), 20000, "recentSales").catch(
+        () => ({ rows: [] })
+      ),
+      queryWithTimeout(
+        query(repairExpensesQuery, [monthStart, monthEnd]),
+        15000,
+        "repairExpenses"
+      ),
+      queryWithTimeout(
+        query(
+          "SELECT COUNT(*) as count FROM approvals WHERE status IN ('pending_sales', 'pending_admin')"
+        ),
+        10000,
+        "pendingApprovals"
+      ).catch((err) => {
+        console.warn("Approvals count error:", err.message);
+        return { rows: [{ count: "0" }] };
+      }),
+    ]);
+
+    // Extract results with error handling
     const [
       monthlySalesRes,
       lastMonthSalesRes,
@@ -163,25 +278,42 @@ router.get("/stats", authenticate, async (req, res) => {
       recentSalesRes,
       repairExpensesRes,
       pendingApprovalsRes,
-    ] = await Promise.all([
-      query(monthlySalesQuery, [currentMonth, currentYear]),
-      query(monthlySalesQuery, [lastMonth, lastMonthYear]),
-      query(monthlyPurchasesQuery, [currentMonth, currentYear]),
-      query(topSuppliersQuery),
-      query(recentSalesQuery),
-      query(repairExpensesQuery, [currentMonth, currentYear]),
-      query(
-        "SELECT COUNT(*) as count FROM approvals WHERE status IN ('pending_sales', 'pending_admin')"
-      ),
-    ]);
+    ] = sqlQueries.map((result, index) => {
+      if (result.status === "fulfilled") {
+        return result.value;
+      } else {
+        console.error(`SQL query ${index} failed:`, result.reason);
+        // Return default structure based on query type
+        if (index === 0 || index === 1) {
+          // Monthly sales queries
+          return { rows: [{ count: "0", revenue: "0" }] };
+        } else if (index === 2) {
+          // Monthly purchases
+          return { rows: [{ count: "0", expense: "0" }] };
+        } else if (index === 3) {
+          // Top suppliers
+          return { rows: [] };
+        } else if (index === 4) {
+          // Recent sales
+          return { rows: [] };
+        } else if (index === 5) {
+          // Repair expenses
+          return { rows: [{ total: "0" }] };
+        } else {
+          // Approvals
+          return { rows: [{ count: "0" }] };
+        }
+      }
+    });
 
-    const monthlySales = parseInt(monthlySalesRes.rows[0].count) || 0;
-    const monthlyRevenue = parseFloat(monthlySalesRes.rows[0].revenue) || 0;
-    const lastMonthSales = parseInt(lastMonthSalesRes.rows[0].count) || 0;
-    const lastMonthRevenue = parseFloat(lastMonthSalesRes.rows[0].revenue) || 0;
-    const monthlyPurchases = parseInt(monthlyPurchasesRes.rows[0].count) || 0;
+    const monthlySales = parseInt(monthlySalesRes.rows[0]?.count) || 0;
+    const monthlyRevenue = parseFloat(monthlySalesRes.rows[0]?.revenue) || 0;
+    const lastMonthSales = parseInt(lastMonthSalesRes.rows[0]?.count) || 0;
+    const lastMonthRevenue =
+      parseFloat(lastMonthSalesRes.rows[0]?.revenue) || 0;
+    const monthlyPurchases = parseInt(monthlyPurchasesRes.rows[0]?.count) || 0;
     const monthlyPurchaseExpense =
-      parseFloat(monthlyPurchasesRes.rows[0].expense) || 0;
+      parseFloat(monthlyPurchasesRes.rows[0]?.expense) || 0;
     const monthlyProfit = monthlyRevenue - monthlyPurchaseExpense;
 
     const topSuppliers = topSuppliersRes.rows.map((row) => ({
@@ -203,16 +335,15 @@ router.get("/stats", authenticate, async (req, res) => {
         : null,
     }));
 
-    const repairExpenses = parseFloat(repairExpensesRes.rows[0].total) || 0;
+    const repairExpenses = parseFloat(repairExpensesRes.rows[0]?.total) || 0;
     const pendingApprovalsCount =
-      parseInt(pendingApprovalsRes.rows[0].count) || 0;
+      parseInt(pendingApprovalsRes.rows[0]?.count) || 0;
 
     // Finance summary (this month) - with error handling
+    // monthStart and monthEnd are already defined above
     let totalIncome = 0;
     let totalExpenses = 0;
     try {
-      const monthStart = new Date(currentYear, currentMonth - 1, 1);
-      const monthEnd = new Date(currentYear, currentMonth, 0); // last day of month
       const dateFrom = monthStart.toISOString().split("T")[0];
       const dateTo = monthEnd.toISOString().split("T")[0];
 
@@ -246,25 +377,17 @@ router.get("/stats", authenticate, async (req, res) => {
       weekEnd.setHours(23, 59, 59, 999);
       const today = new Date().toISOString().split("T")[0];
 
-      // Run all secretary queries in parallel
-      const [
-        contractsDraftedQuery,
-        approvedContractsQuery,
-        pendingStaffTasksResult,
-        meetingsThisWeekQuery,
-        reportsDueToday,
-        documentsUploadedQuery,
-      ] = await Promise.all([
+      // Run all secretary queries in parallel with error handling
+      const secretaryQueries = await Promise.allSettled([
         query(
           `SELECT COUNT(*) as count FROM contracts 
-           WHERE EXTRACT(MONTH FROM created_at) = $1 
-           AND EXTRACT(YEAR FROM created_at) = $2`,
-          [currentMonth, currentYear]
+           WHERE created_at >= $1 AND created_at <= $2`,
+          [monthStart, monthEnd]
         ),
         query(
           `SELECT COUNT(*) as count FROM contracts WHERE status = 'active'`
         ),
-        StaffTask.count({ status: "pending" }),
+        StaffTask.count({ status: "pending" }).catch(() => 0),
         query(
           `SELECT COUNT(*) as count FROM meetings 
            WHERE scheduled_date >= $1 AND scheduled_date <= $2`,
@@ -277,21 +400,46 @@ router.get("/stats", authenticate, async (req, res) => {
         ),
         query(
           `SELECT COUNT(*) as count FROM documents 
-           WHERE EXTRACT(MONTH FROM created_at) = $1 
-           AND EXTRACT(YEAR FROM created_at) = $2`,
-          [currentMonth, currentYear]
+           WHERE created_at >= $1 AND created_at <= $2`,
+          [monthStart, monthEnd]
         ),
       ]);
 
+      // Extract results with defaults on failure
+      const contractsDraftedQuery =
+        secretaryQueries[0].status === "fulfilled"
+          ? secretaryQueries[0].value
+          : { rows: [{ count: "0" }] };
+      const approvedContractsQuery =
+        secretaryQueries[1].status === "fulfilled"
+          ? secretaryQueries[1].value
+          : { rows: [{ count: "0" }] };
+      const pendingStaffTasksResult =
+        secretaryQueries[2].status === "fulfilled"
+          ? secretaryQueries[2].value
+          : 0;
+      const meetingsThisWeekQuery =
+        secretaryQueries[3].status === "fulfilled"
+          ? secretaryQueries[3].value
+          : { rows: [{ count: "0" }] };
+      const reportsDueToday =
+        secretaryQueries[4].status === "fulfilled"
+          ? secretaryQueries[4].value
+          : { rows: [{ count: "0" }] };
+      const documentsUploadedQuery =
+        secretaryQueries[5].status === "fulfilled"
+          ? secretaryQueries[5].value
+          : { rows: [{ count: "0" }] };
+
       secretaryStats = {
         contractsDraftedThisMonth:
-          parseInt(contractsDraftedQuery.rows[0].count) || 0,
-        approvedContracts: parseInt(approvedContractsQuery.rows[0].count) || 0,
+          parseInt(contractsDraftedQuery.rows[0]?.count) || 0,
+        approvedContracts: parseInt(approvedContractsQuery.rows[0]?.count) || 0,
         pendingStaffTasks: pendingStaffTasksResult || 0,
-        meetingsThisWeek: parseInt(meetingsThisWeekQuery.rows[0].count) || 0,
-        reportsDueToday: parseInt(reportsDueToday.rows[0].count) || 0,
+        meetingsThisWeek: parseInt(meetingsThisWeekQuery.rows[0]?.count) || 0,
+        reportsDueToday: parseInt(reportsDueToday.rows[0]?.count) || 0,
         documentsUploadedThisMonth:
-          parseInt(documentsUploadedQuery.rows[0].count) || 0,
+          parseInt(documentsUploadedQuery.rows[0]?.count) || 0,
       };
     } catch (secretaryError) {
       console.warn("Secretary stats error:", secretaryError.message);
@@ -375,15 +523,29 @@ router.get("/stats", authenticate, async (req, res) => {
 
     const duration = Date.now() - startTime;
     console.log(`Dashboard stats compiled successfully in ${duration}ms`);
+    clearTimeout(timeout);
     res.json(stats);
   } catch (error) {
+    clearTimeout(timeout);
     console.error("Dashboard stats error:", error);
+    console.error("Error message:", error.message);
+    console.error("Error code:", error.code);
     console.error("Error stack:", error.stack);
-    res.status(500).json({
-      error: "Failed to fetch dashboard statistics",
-      details: error.message,
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Failed to fetch dashboard statistics",
+        message: error.message,
+        code: error.code,
+        details:
+          process.env.NODE_ENV === "development"
+            ? {
+                message: error.message,
+                stack: error.stack,
+                code: error.code,
+              }
+            : "An error occurred while fetching dashboard statistics. Please check server logs.",
+      });
+    }
   }
 });
 

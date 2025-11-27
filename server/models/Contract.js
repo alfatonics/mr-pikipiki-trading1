@@ -27,6 +27,7 @@ class Contract {
       installmentStartDate,
       installmentInterestRate,
       installmentTotalAmount,
+      ramaInspectionStatus = "pending", // Default to pending when contract is created
     } = data;
 
     const sql = `
@@ -35,14 +36,17 @@ class Contract {
         date, effective_date, expiry_date, payment_method, terms, status, created_by,
         notes, internal_notes, priority,
         installment_down_payment, installment_monthly_payment, installment_duration,
-        installment_start_date, installment_interest_rate, installment_total_amount
+        installment_start_date, installment_interest_rate, installment_total_amount,
+        rama_inspection_status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
       RETURNING id, contract_number as "contractNumber", type, motorcycle_id as "motorcycleId",
                 party_id as "partyId", party_model as "partyModel", amount, currency,
                 date, effective_date as "effectiveDate", expiry_date as "expiryDate",
                 payment_method as "paymentMethod", terms, status, created_by as "createdBy",
                 notes, internal_notes as "internalNotes", priority,
+                rama_inspection_status as "ramaInspectionStatus",
+                rama_inspected_by as "ramaInspectedBy", rama_inspected_at as "ramaInspectedAt",
                 created_at as "createdAt", updated_at as "updatedAt"
     `;
 
@@ -70,6 +74,7 @@ class Contract {
       installmentStartDate,
       installmentInterestRate,
       installmentTotalAmount,
+      ramaInspectionStatus,
     ]);
     return result.rows[0];
   }
@@ -108,6 +113,9 @@ class Contract {
         notes: row.notes,
         internalNotes: row.internal_notes,
         priority: row.priority,
+        ramaInspectionStatus: row.rama_inspection_status || "pending",
+        ramaInspectedBy: row.rama_inspected_by,
+        ramaInspectedAt: row.rama_inspected_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         motorcycleChassisNumber: row.motorcycleChassisNumber,
@@ -124,6 +132,8 @@ class Contract {
              c.party_id as "partyId", c.party_model as "partyModel", c.amount, c.currency,
              c.date, c.effective_date as "effectiveDate", c.expiry_date as "expiryDate",
              c.payment_method as "paymentMethod", c.status, c.priority,
+             c.rama_inspection_status as "ramaInspectionStatus",
+             c.rama_inspected_by as "ramaInspectedBy", c.rama_inspected_at as "ramaInspectedAt",
              c.created_at as "createdAt", c.updated_at as "updatedAt",
              m.chassis_number as "motorcycleChassisNumber",
              m.brand as "motorcycleBrand",
@@ -148,6 +158,12 @@ class Contract {
       paramCount++;
     }
 
+    if (filters.ramaInspectionStatus) {
+      sql += ` AND c.rama_inspection_status = $${paramCount}`;
+      params.push(filters.ramaInspectionStatus);
+      paramCount++;
+    }
+
     sql += " ORDER BY c.created_at DESC";
 
     const result = await query(sql, params);
@@ -167,6 +183,9 @@ class Contract {
       priority: "priority",
       amount: "amount",
       expiryDate: "expiry_date",
+      ramaInspectionStatus: "rama_inspection_status",
+      ramaInspectedBy: "rama_inspected_by",
+      ramaInspectedAt: "rama_inspected_at",
     };
 
     for (const [jsKey, dbKey] of Object.entries(fieldMap)) {

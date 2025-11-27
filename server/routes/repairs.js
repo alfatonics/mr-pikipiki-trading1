@@ -18,7 +18,19 @@ router.get("/", authenticate, async (req, res) => {
     if (motorcycle) filter.motorcycleId = motorcycle;
 
     const repairs = await Repair.findAll(filter);
-    res.json(repairs);
+
+    // Add spare parts to each repair
+    const repairsWithParts = await Promise.all(
+      repairs.map(async (repair) => {
+        const spareParts = await Repair.getSpareParts(repair.id);
+        return {
+          ...repair,
+          spareParts: spareParts || [],
+        };
+      })
+    );
+
+    res.json(repairsWithParts);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch repairs" });
   }

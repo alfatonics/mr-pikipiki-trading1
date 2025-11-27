@@ -30,12 +30,14 @@ const MyJobs = () => {
   const [filter, setFilter] = useState("active"); // active, awaiting, completed
 
   const [detailsData, setDetailsData] = useState({
-    spareParts: [{ name: "", quantity: 1, cost: 0 }],
-    laborHours: 0,
-    laborCost: 0,
-    workDescription: "",
+    workItems: [
+      {
+        workDescription: "",
+        spareParts: [{ name: "", quantity: 1, cost: 0 }],
+        laborCost: 0,
+      },
+    ],
     issuesFound: "",
-    recommendations: "",
     proofOfWork: null,
   });
   const [bills, setBills] = useState([]);
@@ -100,15 +102,34 @@ const MyJobs = () => {
     }
   };
 
-  const handleRegisterDetails = (repair) => {
+  const handleRegisterDetails = async (repair) => {
     setSelectedRepair(repair);
+
+    // Fetch full inspection data if this repair is linked to an inspection
+    let inspectionData = null;
+    if (repair.inspectionId) {
+      try {
+        const inspRes = await axios.get(
+          `/api/inspections/${repair.inspectionId}`
+        );
+        inspectionData = inspRes.data;
+      } catch (error) {
+        console.error("Failed to fetch inspection data:", error);
+      }
+    }
+
+    setSelectedRepair({ ...repair, inspection: inspectionData });
     setDetailsData({
-      spareParts: [{ name: "", quantity: 1, cost: 0 }],
-      laborHours: 0,
-      laborCost: 0,
-      workDescription: "",
-      issuesFound: "",
-      recommendations: "",
+      workItems: [
+        {
+          workDescription: "",
+          spareParts: [{ name: "", quantity: 1, cost: 0 }],
+          laborCost: 0,
+        },
+      ],
+      // Pre-fill issuesFound with report from GIDIONI (stored in repair.notes or description)
+      issuesFound:
+        repair.issuesFound || repair.notes || repair.description || "",
       proofOfWork: null,
     });
     setDetailsModalOpen(true);
@@ -172,39 +193,51 @@ const MyJobs = () => {
   const handleSubmitDetails = async (e) => {
     e.preventDefault();
 
-    if (
-      !detailsData.workDescription ||
-      detailsData.workDescription.trim() === ""
-    ) {
-      alert("Please provide a work description");
+    // Validate at least one work item has description
+    const hasValidWork = detailsData.workItems.some(
+      (item) => item.workDescription && item.workDescription.trim() !== ""
+    );
+    if (!hasValidWork) {
+      alert("Please provide at least one work description");
       return;
     }
 
-    if (parseFloat(detailsData.laborCost) <= 0) {
-      alert("Please enter labor cost");
-      return;
-    }
+    // Calculate totals from all work items
+    let totalLaborCost = 0;
+    let allSpareParts = [];
+    let workDescriptions = [];
 
-    if (parseFloat(detailsData.laborHours) <= 0) {
-      alert("Please enter labor hours");
-      return;
-    }
+    detailsData.workItems.forEach((item) => {
+      if (item.workDescription && item.workDescription.trim()) {
+        workDescriptions.push(item.workDescription);
+        totalLaborCost += parseFloat(item.laborCost) || 0;
+        allSpareParts = allSpareParts.concat(
+          item.spareParts.filter((p) => p.name && p.name.trim())
+        );
+      }
+    });
 
     try {
       const formData = new FormData();
-      formData.append("spareParts", JSON.stringify(detailsData.spareParts));
-      formData.append("laborHours", detailsData.laborHours);
-      formData.append("laborCost", detailsData.laborCost);
-      formData.append("workDescription", detailsData.workDescription);
+      formData.append("spareParts", JSON.stringify(allSpareParts));
+      formData.append("laborHours", 0); // Not used in new structure
+      formData.append("laborCost", totalLaborCost);
+      formData.append("workDescription", workDescriptions.join("\n\n"));
       formData.append("issuesFound", detailsData.issuesFound || "");
-      formData.append("recommendations", detailsData.recommendations || "");
+      formData.append("recommendations", "");
 
       if (detailsData.proofOfWork) {
         formData.append("proofOfWork", detailsData.proofOfWork);
       }
 
+      const repairId = selectedRepair.id || selectedRepair._id;
+      if (!repairId) {
+        alert("Error: Repair ID not found. Please try again.");
+        return;
+      }
+
       const response = await axios.post(
-        `/api/repairs/${selectedRepair._id}/register-details`,
+        `/api/repairs/${repairId}/register-details`,
         formData,
         {
           headers: {
@@ -245,29 +278,70 @@ const MyJobs = () => {
     }
   };
 
-  const addSparePartRow = () => {
+  // Add new work item
+  const addWorkItem = () => {
     setDetailsData({
       ...detailsData,
-      spareParts: [
-        ...detailsData.spareParts,
-        { name: "", quantity: 1, cost: 0 },
+      workItems: [
+        ...detailsData.workItems,
+        {
+          workDescription: "",
+          spareParts: [{ name: "", quantity: 1, cost: 0 }],
+          laborCost: 0,
+        },
       ],
     });
   };
 
-  const removeSparePartRow = (index) => {
-    const newParts = detailsData.spareParts.filter((_, i) => i !== index);
+  // Remove work item
+  const removeWorkItem = (workIndex) => {
+    const newItems = detailsData.workItems.filter((_, i) => i !== workIndex);
     setDetailsData({
       ...detailsData,
-      spareParts:
-        newParts.length > 0 ? newParts : [{ name: "", quantity: 1, cost: 0 }],
+      workItems:
+        newItems.length > 0
+          ? newItems
+          : [
+              {
+                workDescription: "",
+                spareParts: [{ name: "", quantity: 1, cost: 0 }],
+                laborCost: 0,
+              },
+            ],
     });
   };
 
-  const updateSparePart = (index, field, value) => {
-    const newParts = [...detailsData.spareParts];
-    newParts[index][field] = value;
-    setDetailsData({ ...detailsData, spareParts: newParts });
+  // Add spare part to specific work item
+  const addSparePartToWork = (workIndex) => {
+    const newItems = [...detailsData.workItems];
+    newItems[workIndex].spareParts.push({ name: "", quantity: 1, cost: 0 });
+    setDetailsData({ ...detailsData, workItems: newItems });
+  };
+
+  // Remove spare part from specific work item
+  const removeSparePartFromWork = (workIndex, partIndex) => {
+    const newItems = [...detailsData.workItems];
+    newItems[workIndex].spareParts = newItems[workIndex].spareParts.filter(
+      (_, i) => i !== partIndex
+    );
+    if (newItems[workIndex].spareParts.length === 0) {
+      newItems[workIndex].spareParts = [{ name: "", quantity: 1, cost: 0 }];
+    }
+    setDetailsData({ ...detailsData, workItems: newItems });
+  };
+
+  // Update spare part in specific work item
+  const updateSparePartInWork = (workIndex, partIndex, field, value) => {
+    const newItems = [...detailsData.workItems];
+    newItems[workIndex].spareParts[partIndex][field] = value;
+    setDetailsData({ ...detailsData, workItems: newItems });
+  };
+
+  // Update work item field
+  const updateWorkItem = (workIndex, field, value) => {
+    const newItems = [...detailsData.workItems];
+    newItems[workIndex][field] = value;
+    setDetailsData({ ...detailsData, workItems: newItems });
   };
 
   const getStatusBadge = (status) => {
@@ -304,8 +378,8 @@ const MyJobs = () => {
     {
       header: "Motorcycle",
       render: (row) => (
-        <div>
-          <div className="font-medium">
+        <div className="min-w-[150px]">
+          <div className="font-medium text-sm">
             {row.motorcycle?.brand} {row.motorcycle?.model}
           </div>
           <div className="text-xs text-gray-500">
@@ -315,21 +389,13 @@ const MyJobs = () => {
       ),
     },
     {
-      header: "Type",
-      render: (row) => row.repairType.replace("_", " ").toUpperCase(),
-    },
-    {
       header: "Description",
       accessor: "description",
       render: (row) => (
-        <div className="max-w-xs truncate" title={row.description}>
+        <div className="max-w-[200px] truncate text-sm" title={row.description}>
           {row.description}
         </div>
       ),
-    },
-    {
-      header: "Assigned Date",
-      render: (row) => new Date(row.startDate).toLocaleDateString(),
     },
     {
       header: "Status",
@@ -338,42 +404,45 @@ const MyJobs = () => {
     {
       header: "Actions",
       render: (row) => (
-        <div className="flex space-x-2">
-          {/* Start Work - for pending */}
+        <div className="flex flex-col sm:flex-row flex-wrap gap-1 sm:gap-2 min-w-[180px]">
+          {/* Pending: clearly show Start Work + Register Details */}
           {row.status === "pending" && (
-            <button
-              onClick={() => handleStartWork(row._id)}
-              className="text-orange-600 hover:text-orange-800"
-              title="Start Work"
-            >
-              <FiPlay />
-            </button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStartWork(row._id || row.id)}
+                className="text-xs whitespace-nowrap"
+              >
+                <FiPlay className="mr-1" />
+                Start
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleRegisterDetails(row)}
+                className="text-xs whitespace-nowrap"
+              >
+                <FiClipboard className="mr-1" />
+                Register
+              </Button>
+            </>
           )}
 
-          {/* Register Details - for in_progress */}
+          {/* In progress: main action is Register Details */}
           {row.status === "in_progress" && (
-            <button
+            <Button
+              size="sm"
               onClick={() => handleRegisterDetails(row)}
-              className="text-purple-600 hover:text-purple-800"
-              title="Register Repair Details"
+              className="text-xs whitespace-nowrap"
             >
-              <FiClipboard />
-            </button>
+              <FiClipboard className="mr-1" />
+              Register Details
+            </Button>
           )}
 
-          {/* Awaiting approval */}
-          {row.status === "awaiting_details_approval" && (
-            <button
-              className="text-orange-600 cursor-not-allowed"
-              title="Awaiting approval from Sales → Admin"
-              disabled
-            >
-              <FiClock />
-            </button>
-          )}
-
-          {/* Send Bill - for details_approved */}
-          {row.status === "details_approved" && (
+          {/* Send Bill - for awaiting_details_approval or details_approved */}
+          {(row.status === "awaiting_details_approval" ||
+            row.status === "details_approved") && (
             <>
               {(() => {
                 const bill = bills.find(
@@ -385,31 +454,34 @@ const MyJobs = () => {
                 );
                 if (!bill) {
                   return (
-                    <button
+                    <Button
+                      size="sm"
                       onClick={() => handleSendBill(row)}
-                      className="text-blue-600 hover:text-blue-800"
-                      title="Send Bill to Cashier"
+                      className="text-xs whitespace-nowrap bg-green-600 hover:bg-green-700 text-white"
                     >
-                      <FiSend />
-                    </button>
+                      <FiSend className="mr-1" />
+                      Send Bill
+                    </Button>
                   );
                 }
                 return (
                   <span
-                    className="text-green-600"
+                    className="inline-flex items-center text-green-600 text-xs font-medium px-2 py-1 bg-green-50 rounded"
                     title={`Bill ${bill.status.replace("_", " ")}`}
                   >
-                    <FiDollarSign />
+                    <FiDollarSign className="mr-1" />
+                    Bill Sent
                   </span>
                 );
               })()}
-              <button
-                onClick={() => handleMarkComplete(row._id)}
-                className="text-green-600 hover:text-green-800"
-                title="Mark as Completed"
+              <Button
+                size="sm"
+                onClick={() => handleMarkComplete(row._id || row.id)}
+                className="text-xs whitespace-nowrap"
               >
-                <FiCheckCircle />
-              </button>
+                <FiCheckCircle className="mr-1" />
+                Complete
+              </Button>
             </>
           )}
         </div>
@@ -552,174 +624,359 @@ const MyJobs = () => {
         size="lg"
       >
         {selectedRepair && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-semibold text-gray-900">Repair Information</h3>
-            <p className="text-sm text-gray-700 mt-1">
-              <strong>Motorcycle:</strong> {selectedRepair.motorcycle?.brand}{" "}
-              {selectedRepair.motorcycle?.model}
-            </p>
-            <p className="text-sm text-gray-700">
-              <strong>Assigned Task:</strong> {selectedRepair.description}
-            </p>
+          <div className="mb-4 space-y-3">
+            {/* Basic Info */}
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <h3 className="font-semibold text-gray-900 mb-2">
+                Taarifa za Pikipiki
+              </h3>
+              <p className="text-sm text-gray-700">
+                <strong>Pikipiki:</strong> {selectedRepair.motorcycle?.brand}{" "}
+                {selectedRepair.motorcycle?.model}
+              </p>
+              <p className="text-sm text-gray-700">
+                <strong>Kazi:</strong> {selectedRepair.description}
+              </p>
+            </div>
+
+            {/* GIDIONI Inspection Report - Detailed */}
+            {selectedRepair.inspection && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
+                  <FiClipboard className="mr-2" />
+                  Report ya Ukaguzi wa GIDIONI
+                </h3>
+
+                {selectedRepair.inspection.notes && (
+                  <div className="mb-3 p-2 bg-white rounded">
+                    <p className="text-sm font-medium text-gray-800">
+                      Maelezo ya Jumla:
+                    </p>
+                    <p className="text-sm text-gray-700 whitespace-pre-line mt-1">
+                      {selectedRepair.inspection.notes}
+                    </p>
+                  </div>
+                )}
+
+                {/* Section A: External Appearance - show failed items */}
+                {selectedRepair.inspection.externalAppearance && (
+                  <div className="mb-2">
+                    <p className="text-xs font-semibold text-gray-700 mb-1">
+                      A. MUONEKANO WA NJE (Vitu vilivyo-fail):
+                    </p>
+                    <ul className="text-xs text-gray-700 space-y-1 ml-4">
+                      {Object.entries(
+                        selectedRepair.inspection.externalAppearance
+                      )
+                        .filter(([key, value]) => value === false)
+                        .map(([key, _], index) => {
+                          const labels = {
+                            q1: "Mkasi sawa",
+                            q2: "Tairi zote salama",
+                            q3: "Brake mbele/nyuma",
+                            q4: "Haijapinda/gonga kifua",
+                            q5: "Rangi maeneo yaliyoharibika",
+                            q6: "Tank halina kutu",
+                            q7: "Shokapu mbele hazivuji",
+                            q8: "Shokapu nyuma sawa",
+                            q9: "Mudguard mbele sawa",
+                            q10: "Mikono clutch/brake sawa",
+                            q11: "Side cover zimefungwa",
+                            q12: "Chain box haigongi",
+                            q13: "Stendi zote sawa",
+                            q14: "Speed meter cable sawa",
+                            q15: "Imesafishwa",
+                            q16: "Funguo wafungua tank",
+                            q17: "Engine & chassis zinalingana",
+                            q18: "Limu haijapinda",
+                            q19: "Taili hazijatoboka",
+                            q20: "Seat imefungwa vizuri",
+                          };
+                          return (
+                            <li key={key} className="text-red-600">
+                              ❌ {labels[key] || key}
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Section B: Electrical System - show failed items */}
+                {selectedRepair.inspection.electricalSystem && (
+                  <div className="mb-2">
+                    <p className="text-xs font-semibold text-gray-700 mb-1">
+                      B. MFUMO WA UMEME (Vitu vilivyo-fail):
+                    </p>
+                    <ul className="text-xs text-gray-700 space-y-1 ml-4">
+                      {Object.entries(
+                        selectedRepair.inspection.electricalSystem
+                      )
+                        .filter(([key, value]) => value === false)
+                        .map(([key, _], index) => {
+                          const labels = {
+                            q21: "Indicators zote zinafanya kazi",
+                            q22: "Honi inafanya kazi",
+                            q23: "Starter inafanya kazi",
+                            q24: "Taa mbele/nyuma zinafanya kazi",
+                            q25: "Switch kuwasha/kuzima inafanya kazi",
+                            q26: "Nyingineyo",
+                          };
+                          return (
+                            <li key={key} className="text-red-600">
+                              ❌ {labels[key] || key}
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Section C: Engine System - show failed items */}
+                {selectedRepair.inspection.engineSystem && (
+                  <div className="mb-2">
+                    <p className="text-xs font-semibold text-gray-700 mb-1">
+                      C. MFUMO WA ENGINE (Vitu vilivyo-fail):
+                    </p>
+                    <ul className="text-xs text-gray-700 space-y-1 ml-4">
+                      {Object.entries(selectedRepair.inspection.engineSystem)
+                        .filter(([key, value]) => value === false)
+                        .map(([key, _], index) => {
+                          const labels = {
+                            q27: "Haitoi moshi",
+                            q28: "Timing chain hailii",
+                            q29: "Piston haigongi",
+                            q30: "Haina leakage",
+                            q31: "Shaft haijachomelewa",
+                            q32: "Kiki inafanya kazi",
+                            q33: "Haina miss",
+                            q34: "Mkono haigongi",
+                            q35: "Carburator sawa",
+                            q36: "Exhaust sawa",
+                            q37: "Clutch system sawa",
+                            q38: "Gear zote zinaingia",
+                            q39: "Gear 1-5 hazivumi",
+                            q40: "Exletor sawa",
+                            q41: "Tapeti hazigongi",
+                            q42: "Engine haina milio tofauti",
+                          };
+                          return (
+                            <li key={key} className="text-red-600">
+                              ❌ {labels[key] || key}
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fallback: if no inspection data, show notes only */}
+            {!selectedRepair.inspection && selectedRepair.notes && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm font-medium text-gray-800">
+                  Maelezo ya Kazi:
+                </p>
+                <p className="mt-1 text-sm text-gray-700 whitespace-pre-line">
+                  {selectedRepair.notes}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         <form onSubmit={handleSubmitDetails}>
-          {/* Spare Parts Section */}
+          {/* Work Items Section */}
           <div className="mb-6">
             <div className="flex justify-between items-center mb-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Spare Parts Used
+              <label className="block text-sm font-semibold text-gray-800">
+                Kazi Zilizofanywa (Work Done)
               </label>
               <button
                 type="button"
-                onClick={addSparePartRow}
-                className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+                onClick={addWorkItem}
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
               >
-                + Add Part
+                + Ongeza Kazi Nyingine
               </button>
             </div>
 
-            <div className="space-y-2">
-              {detailsData.spareParts.map((part, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2">
-                  <div className="col-span-5">
-                    <input
-                      type="text"
-                      placeholder="Part name (e.g., Engine Oil)"
-                      value={part.name}
-                      onChange={(e) =>
-                        updateSparePart(index, "name", e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
+            {detailsData.workItems.map((workItem, workIndex) => (
+              <div
+                key={workIndex}
+                className="mb-4 p-4 border border-gray-300 rounded-lg bg-white"
+              >
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-medium text-gray-800">
+                    Kazi #{workIndex + 1}
+                  </h4>
+                  {detailsData.workItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeWorkItem(workIndex)}
+                      className="text-red-600 hover:text-red-800 text-sm"
+                    >
+                      <FiX className="inline mr-1" />
+                      Ondoa
+                    </button>
+                  )}
+                </div>
+
+                {/* Work Description */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Maelezo ya Kazi (Work Description) *
+                  </label>
+                  <textarea
+                    value={workItem.workDescription}
+                    onChange={(e) =>
+                      updateWorkItem(
+                        workIndex,
+                        "workDescription",
+                        e.target.value
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    rows="2"
+                    placeholder="Mfano: Badilisha mafuta ya engine na filter"
+                    required
+                  />
+                </div>
+
+                {/* Spare Parts for this work */}
+                <div className="mb-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Vipuri Vilivyotumika (Spare Parts)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => addSparePartToWork(workIndex)}
+                      className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                    >
+                      + Ongeza Kipuri
+                    </button>
                   </div>
-                  <div className="col-span-2">
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      value={part.quantity}
-                      onChange={(e) =>
-                        updateSparePart(
-                          index,
-                          "quantity",
-                          parseFloat(e.target.value) || 1
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      min="1"
-                    />
-                  </div>
-                  <div className="col-span-4">
-                    <input
-                      type="number"
-                      placeholder="Cost (TZS)"
-                      value={part.cost}
-                      onChange={(e) =>
-                        updateSparePart(
-                          index,
-                          "cost",
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      min="0"
-                    />
-                  </div>
-                  <div className="col-span-1 flex items-center justify-center">
-                    {detailsData.spareParts.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeSparePartRow(index)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Remove part"
-                      >
-                        <FiX />
-                      </button>
-                    )}
+
+                  <div className="space-y-2">
+                    {/* Header row for spare parts */}
+                    <div className="grid grid-cols-12 gap-2 text-xs font-medium text-gray-600 mb-1">
+                      <div className="col-span-5">Jina la Kipuri</div>
+                      <div className="col-span-2">Idadi</div>
+                      <div className="col-span-4">Bei (TZS)</div>
+                      <div className="col-span-1"></div>
+                    </div>
+
+                    {workItem.spareParts.map((part, partIndex) => (
+                      <div key={partIndex} className="grid grid-cols-12 gap-2">
+                        <div className="col-span-5">
+                          <input
+                            type="text"
+                            placeholder="Mfano: Engine Oil"
+                            value={part.name}
+                            onChange={(e) =>
+                              updateSparePartInWork(
+                                workIndex,
+                                partIndex,
+                                "name",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            placeholder="1"
+                            value={part.quantity}
+                            onChange={(e) =>
+                              updateSparePartInWork(
+                                workIndex,
+                                partIndex,
+                                "quantity",
+                                parseFloat(e.target.value) || 1
+                              )
+                            }
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            min="1"
+                          />
+                        </div>
+                        <div className="col-span-4">
+                          <input
+                            type="number"
+                            placeholder="25000"
+                            value={part.cost}
+                            onChange={(e) =>
+                              updateSparePartInWork(
+                                workIndex,
+                                partIndex,
+                                "cost",
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            min="0"
+                          />
+                        </div>
+                        <div className="col-span-1 flex items-center justify-center">
+                          {workItem.spareParts.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeSparePartFromWork(workIndex, partIndex)
+                              }
+                              className="text-red-600 hover:text-red-800"
+                              title="Ondoa kipuri"
+                            >
+                              <FiX />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Labor Cost for this work */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Gharama ya Kazi (Labor Cost) - TZS
+                  </label>
+                  <input
+                    type="number"
+                    value={workItem.laborCost}
+                    onChange={(e) =>
+                      updateWorkItem(
+                        workIndex,
+                        "laborCost",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Mfano: 50000"
+                    min="0"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Labor Information */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <Input
-              label="Labor Hours *"
-              type="number"
-              step="0.5"
-              value={detailsData.laborHours}
-              onChange={(e) =>
-                setDetailsData({ ...detailsData, laborHours: e.target.value })
-              }
-              placeholder="e.g., 4.5"
-              required
-            />
-            <Input
-              label="Labor Cost (TZS) *"
-              type="number"
-              value={detailsData.laborCost}
-              onChange={(e) =>
-                setDetailsData({ ...detailsData, laborCost: e.target.value })
-              }
-              placeholder="e.g., 50000"
-              required
-            />
-          </div>
-
-          {/* Work Description */}
+          {/* Issues Found (pre-filled from GIDIONI report) */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              What Work Did You Do? *
-            </label>
-            <textarea
-              value={detailsData.workDescription}
-              onChange={(e) =>
-                setDetailsData({
-                  ...detailsData,
-                  workDescription: e.target.value,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              rows="3"
-              placeholder="Example: Changed engine oil and filter, inspected brake system, topped up brake fluid, checked tire pressure"
-              required
-            />
-          </div>
-
-          {/* Issues Found */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Issues Found (If Any)
+              Matatizo Yaliyopatikana (Issues Found - kutoka GIDIONI)
             </label>
             <textarea
               value={detailsData.issuesFound}
               onChange={(e) =>
                 setDetailsData({ ...detailsData, issuesFound: e.target.value })
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              rows="2"
-              placeholder="Example: Brake pads worn to 30%, oil was very dark indicating delayed service"
-            />
-          </div>
-
-          {/* Recommendations */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Recommendations for Customer
-            </label>
-            <textarea
-              value={detailsData.recommendations}
-              onChange={(e) =>
-                setDetailsData({
-                  ...detailsData,
-                  recommendations: e.target.value,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              rows="2"
-              placeholder="Example: Replace brake pads within 1000km, schedule next oil change in 3000km"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50"
+              rows="3"
+              placeholder="Matatizo kutoka kwa GIDIONI..."
+              readOnly
             />
           </div>
 

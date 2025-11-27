@@ -26,6 +26,7 @@ import Error404 from "./pages/Error404";
 import ContractForms from "./pages/ContractForms";
 import InspectionForm from "./pages/InspectionForm";
 import Cashier from "./pages/Cashier";
+import PricingApproval from "./pages/PricingApproval";
 import CRM from "./pages/CRM";
 import Tasks from "./pages/Tasks";
 import MechanicReports from "./pages/MechanicReports";
@@ -37,6 +38,8 @@ import Documents from "./pages/Documents";
 import OfficeSupplies from "./pages/OfficeSupplies";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Loans from "./pages/Loans";
+import BikeForInspection from "./pages/BikeForInspection";
 import Layout from "./components/Layout";
 
 const PrivateRoute = ({ children }) => {
@@ -145,6 +148,7 @@ function App() {
                 <Route path="contract-forms" element={<ContractForms />} />
                 <Route path="inspection-form" element={<InspectionForm />} />
                 <Route path="cashier" element={<Cashier />} />
+                <Route path="pricing-approval" element={<PricingApproval />} />
                 <Route path="crm" element={<CRM />} />
                 <Route path="tasks" element={<Tasks />} />
                 <Route path="mechanic-reports" element={<MechanicReports />} />
@@ -154,6 +158,11 @@ function App() {
                 <Route path="attendance" element={<Attendance />} />
                 <Route path="documents" element={<Documents />} />
                 <Route path="office-supplies" element={<OfficeSupplies />} />
+                <Route path="loans" element={<Loans />} />
+                <Route
+                  path="bike-for-inspection"
+                  element={<BikeForInspection />}
+                />
                 <Route path="profile" element={<Profile />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
