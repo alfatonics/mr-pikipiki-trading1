@@ -15,8 +15,33 @@ const router = express.Router();
 const generateContractNumber = async (type) => {
   const prefix = type === "purchase" ? "PC" : "SC";
   const year = new Date().getFullYear();
-  const count = await Contract.count({ type });
-  return `${prefix}-${year}-${String(count + 1).padStart(4, "0")}`;
+
+  // Always base the next number on the current MAX contract_number for this type + year
+  // This avoids duplicates when some rows have been deleted or imported manually.
+  const sql = `
+    SELECT contract_number
+    FROM contracts
+    WHERE type = $1
+      AND contract_number LIKE $2
+    ORDER BY contract_number DESC
+    LIMIT 1
+  `;
+
+  const likePattern = `${prefix}-${year}-%`;
+  const result = await query(sql, [type, likePattern]);
+
+  let nextSequence = 1;
+
+  if (result.rows[0]?.contract_number) {
+    const lastNumber = result.rows[0].contract_number;
+    const parts = lastNumber.split("-");
+    const lastSeq = parseInt(parts[parts.length - 1], 10);
+    if (!Number.isNaN(lastSeq)) {
+      nextSequence = lastSeq + 1;
+    }
+  }
+
+  return `${prefix}-${year}-${String(nextSequence).padStart(4, "0")}`;
 };
 
 // Get all contracts

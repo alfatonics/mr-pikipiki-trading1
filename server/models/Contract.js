@@ -227,6 +227,13 @@ class Contract {
     if (filters.status) {
       sql += ` AND status = $${paramCount}`;
       params.push(filters.status);
+      paramCount++;
+    }
+
+    if (filters.type) {
+      sql += ` AND type = $${paramCount}`;
+      params.push(filters.type);
+      paramCount++;
     }
 
     const result = await query(sql, params);
