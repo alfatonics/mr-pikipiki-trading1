@@ -120,6 +120,7 @@ const InspectionForm = () => {
   const [customers, setCustomers] = useState([]);
   const [selectedMotorcycle, setSelectedMotorcycle] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [contractData, setContractData] = useState(null); // Store contract details for display
 
   // Determine which sections to show based on workflow status and user role
   const canEditRamaSection =
@@ -149,11 +150,17 @@ const InspectionForm = () => {
   const shouldShowMotorcycleSelect = !contractId || user?.role === "transport";
 
   useEffect(() => {
+    console.log("🔄 useEffect triggered:", {
+      inspectionId,
+      motorcycleId,
+      contractId,
+      userRole: user?.role,
+    });
     fetchData();
     if (inspectionId) {
       fetchInspectionData();
     }
-  }, [inspectionId, motorcycleId, contractId]);
+  }, [inspectionId, motorcycleId, contractId, user?.role]);
 
   const fetchData = async () => {
     try {
@@ -168,10 +175,24 @@ const InspectionForm = () => {
       // If contractId is provided, fetch contract details and autofill
       if (contractId) {
         try {
+          console.log(
+            "📋 Fetching contract details for contractId:",
+            contractId
+          );
           const contractRes = await axios.get(
             `/api/contracts/${contractId}/detailed`
           );
           const { contract, motorcycle, party } = contractRes.data;
+
+          console.log("📋 Contract data received:", {
+            contract: contract?.contractNumber,
+            type: contract?.type,
+            motorcycle: motorcycle?.chassisNumber,
+            party: party?.name || party?.fullName,
+          });
+
+          // Store contract data for display (especially for RAMA)
+          setContractData({ contract, motorcycle, party });
 
           // Autofill motorcycle data
           if (motorcycle) {
@@ -208,6 +229,9 @@ const InspectionForm = () => {
           // Fallback to basic contract fetch
           const contractRes = await axios.get(`/api/contracts/${contractId}`);
           const contract = contractRes.data;
+
+          // Store basic contract data
+          setContractData({ contract, motorcycle: null, party: null });
 
           if (contract.motorcycleId) {
             const bike = bikesRes.data.find(
@@ -694,6 +718,369 @@ const InspectionForm = () => {
               />
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* Contract Details Section - Show for RAMA when contractId exists */}
+      {(() => {
+        const shouldShow = contractId && user?.role === "registration";
+        const willShow = contractId || contractData;
+        console.log("🔍 Contract section check:", {
+          contractId,
+          userRole: user?.role,
+          shouldShow,
+          willShow,
+          hasContractData: !!contractData,
+          contractNumber: contractData?.contract?.contractNumber,
+        });
+        // Temporarily show for debugging - remove after testing
+        if (contractId && !shouldShow) {
+          console.warn("⚠️ Contract section not showing because:", {
+            hasContractId: !!contractId,
+            userRole: user?.role,
+            expectedRole: "registration",
+          });
+        }
+        if (willShow) {
+          console.log("✅ Contract section WILL BE RENDERED");
+        } else {
+          console.warn("❌ Contract section WILL NOT BE RENDERED");
+        }
+        return null;
+      })()}
+      {/* Show contract details if contractId exists - formatted like printable contract */}
+      {(contractId || contractData) && (
+        <div className="p-4 print:hidden">
+          <div className="max-w-4xl mx-auto bg-white p-8 border border-gray-200 rounded-lg shadow-sm mb-4">
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="text-center border-b pb-4">
+                <h2 className="text-2xl font-bold mb-2">
+                  {contractData?.contract?.type === "purchase"
+                    ? "MKATABA WA KUNUNUA PIKIPIKI"
+                    : "MKATABA WA MAUZIANO YA PIKIPIKI"}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Mkataba huu{" "}
+                  {contractData?.contract?.type === "purchase"
+                    ? "wa kununua"
+                    : "wa kuuza"}{" "}
+                  pikipiki unafungwa{" "}
+                  {contractData?.contract?.date
+                    ? new Date(contractData.contract.date).toLocaleDateString(
+                        "sw-TZ"
+                      )
+                    : "leo"}
+                </p>
+              </div>
+
+              {/* Contract Info */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p>
+                    <strong>Namba ya Mkataba:</strong>{" "}
+                    {contractData?.contract?.contractNumber || "N/A"}
+                  </p>
+                  <p>
+                    <strong>Aina ya Mkataba:</strong>{" "}
+                    {contractData?.contract?.type === "purchase"
+                      ? "Kununua"
+                      : "Kuuza"}
+                  </p>
+                  <p>
+                    <strong>Tarehe:</strong>{" "}
+                    {contractData?.contract?.date
+                      ? new Date(contractData.contract.date).toLocaleDateString(
+                          "sw-TZ"
+                        )
+                      : "N/A"}
+                  </p>
+                  <p>
+                    <strong>Hali:</strong>{" "}
+                    {contractData?.contract?.status || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  {contractData?.party && (
+                    <>
+                      <p>
+                        <strong>
+                          {contractData.contract?.type === "purchase"
+                            ? "Muuzaji"
+                            : "Mnunuzi"}
+                          :
+                        </strong>{" "}
+                        {contractData.party.fullName ||
+                          contractData.party.name ||
+                          "N/A"}
+                      </p>
+                      {contractData.party.phone && (
+                        <p>
+                          <strong>Simu:</strong> {contractData.party.phone}
+                        </p>
+                      )}
+                      {contractData.party.address && (
+                        <p>
+                          <strong>Anwani:</strong> {contractData.party.address}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Motorcycle Details */}
+              {contractData?.motorcycle && (
+                <div className="border-t pt-4">
+                  <p className="font-semibold mb-2">
+                    PIKIPIKI YENYE TAARIFA ZIFUATAZO
+                  </p>
+                  <div className="grid grid-cols-2 gap-4 pl-4 text-sm">
+                    <div>
+                      <p>
+                        <strong>AINA:</strong> {contractData.motorcycle.brand}{" "}
+                        {contractData.motorcycle.model}
+                      </p>
+                      <p>
+                        <strong>MWAKA:</strong>{" "}
+                        {contractData.motorcycle.year || "N/A"}
+                      </p>
+                      <p>
+                        <strong>RANGI:</strong>{" "}
+                        {contractData.motorcycle.color || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p>
+                        <strong>ENGINE NUMBER:</strong>{" "}
+                        {contractData.motorcycle.engineNumber}
+                      </p>
+                      <p>
+                        <strong>CHASIS NUMBER:</strong>{" "}
+                        {contractData.motorcycle.chassisNumber}
+                      </p>
+                      {contractData.motorcycle.registrationNumber && (
+                        <p>
+                          <strong>USAJILI:</strong>{" "}
+                          {contractData.motorcycle.registrationNumber}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Previous Owner Section (from notes) */}
+              {contractData?.contract?.notes &&
+                (() => {
+                  try {
+                    const notes =
+                      typeof contractData.contract.notes === "string"
+                        ? JSON.parse(contractData.contract.notes)
+                        : contractData.contract.notes;
+
+                    if (notes.previousOwner) {
+                      return (
+                        <div className="border-t pt-4">
+                          <p className="font-semibold mb-3 text-base">
+                            PIKIPIKI AMBAYO IMENUNULIWA/KUTOKA KWA
+                          </p>
+                          <div className="grid grid-cols-2 gap-6 pl-4 text-sm">
+                            <div className="space-y-2">
+                              <p>
+                                <strong>JINA:</strong>{" "}
+                                {notes.previousOwner.name || "N/A"}
+                              </p>
+                              <p>
+                                <strong>MAWASILIANO:</strong>{" "}
+                                {notes.previousOwner.contact || "N/A"}
+                              </p>
+                              {notes.previousOwner.tin && (
+                                <p>
+                                  <strong>TIN NUMBER:</strong>{" "}
+                                  {notes.previousOwner.tin}
+                                </p>
+                              )}
+                              {notes.previousOwner.idType && (
+                                <p>
+                                  <strong>AINA YA KITAMBULISHO:</strong>{" "}
+                                  {notes.previousOwner.idType}
+                                </p>
+                              )}
+                              {notes.previousOwner.idNumber && (
+                                <p>
+                                  <strong>NAMBA ZA KITAMBULISHO:</strong>{" "}
+                                  {notes.previousOwner.idNumber}
+                                </p>
+                              )}
+                              {notes.previousOwner.address && (
+                                <p>
+                                  <strong>MAKAZI YAKE:</strong>{" "}
+                                  {notes.previousOwner.address}
+                                </p>
+                              )}
+                              {notes.previousOwner.occupation && (
+                                <p>
+                                  <strong>KAZI:</strong>{" "}
+                                  {notes.previousOwner.occupation}
+                                </p>
+                              )}
+                            </div>
+                            {notes.previousOwnerPhoto && (
+                              <div className="flex flex-col items-center">
+                                <p className="font-semibold mb-2 text-sm text-center">
+                                  PICHA YA MMLIKI WA AWALI
+                                </p>
+                                <div className="border-2 border-dashed border-gray-400 h-40 w-32 flex items-center justify-center bg-gray-50">
+                                  <img
+                                    src={notes.previousOwnerPhoto}
+                                    alt="Previous Owner"
+                                    className="max-h-full max-w-full object-contain"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  } catch (e) {
+                    return null;
+                  }
+                })()}
+
+              {/* Brought By Section (from notes) */}
+              {contractData?.contract?.notes &&
+                (() => {
+                  try {
+                    const notes =
+                      typeof contractData.contract.notes === "string"
+                        ? JSON.parse(contractData.contract.notes)
+                        : contractData.contract.notes;
+
+                    // Handle both string and object formats for broughtBy
+                    const broughtBy = notes.broughtBy;
+                    if (broughtBy) {
+                      // Check if broughtBy is an object or string
+                      const isObject =
+                        typeof broughtBy === "object" && broughtBy !== null;
+
+                      return (
+                        <div className="border-t pt-4">
+                          <p className="font-semibold mb-3 text-base">
+                            AMBAYE AMELETWA/KAELEKEZWA KWA MR PIKIPIKI TRADING
+                            NA
+                          </p>
+                          <div className="pl-4 text-sm">
+                            {isObject ? (
+                              <div className="space-y-2">
+                                {broughtBy.name && (
+                                  <p>
+                                    <strong>JINA:</strong> {broughtBy.name}
+                                  </p>
+                                )}
+                                {broughtBy.contact && (
+                                  <p>
+                                    <strong>MAWASILIANO:</strong>{" "}
+                                    {broughtBy.contact}
+                                  </p>
+                                )}
+                                {broughtBy.address && (
+                                  <p>
+                                    <strong>MAKAZI:</strong> {broughtBy.address}
+                                  </p>
+                                )}
+                                {broughtBy.occupation && (
+                                  <p>
+                                    <strong>KAZI:</strong>{" "}
+                                    {broughtBy.occupation}
+                                  </p>
+                                )}
+                                {broughtBy.relationship && (
+                                  <p>
+                                    <strong>UHUSIANO:</strong>{" "}
+                                    {broughtBy.relationship}
+                                  </p>
+                                )}
+                                {broughtBy.idType && (
+                                  <p>
+                                    <strong>AINA YA KITAMBULISHO:</strong>{" "}
+                                    {broughtBy.idType}
+                                  </p>
+                                )}
+                                {broughtBy.idNumber && (
+                                  <p>
+                                    <strong>NAMBA ZA KITAMBULISHO:</strong>{" "}
+                                    {broughtBy.idNumber}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <p>
+                                <strong>JINA:</strong> {String(broughtBy)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  } catch (e) {
+                    console.error("Error parsing broughtBy:", e);
+                    return null;
+                  }
+                })()}
+
+              {/* Price Information */}
+              {contractData?.contract?.amount && (
+                <div className="border-t pt-4">
+                  <p className="font-semibold mb-2">TAARIFA ZA MALIPO</p>
+                  <div className="pl-4 text-sm space-y-1">
+                    <p>
+                      <strong>Kiasi cha Mkataba:</strong>{" "}
+                      {contractData.contract.amount.toLocaleString()}{" "}
+                      {contractData.contract.currency || "TZS"}
+                    </p>
+                    {contractData?.contract?.notes &&
+                      (() => {
+                        try {
+                          const notes =
+                            typeof contractData.contract.notes === "string"
+                              ? JSON.parse(contractData.contract.notes)
+                              : contractData.contract.notes;
+
+                          return (
+                            <>
+                              {notes.salePrice && (
+                                <p>
+                                  <strong>Bei ya Kuuza:</strong>{" "}
+                                  {notes.salePrice.toLocaleString()} TZS
+                                </p>
+                              )}
+                              {notes.amountPaid && (
+                                <p>
+                                  <strong>Kiasi Kilicholipwa:</strong>{" "}
+                                  {notes.amountPaid.toLocaleString()} TZS
+                                </p>
+                              )}
+                              {notes.remainingBalance && (
+                                <p>
+                                  <strong>Salio:</strong>{" "}
+                                  {notes.remainingBalance.toLocaleString()} TZS
+                                </p>
+                              )}
+                            </>
+                          );
+                        } catch (e) {
+                          return null;
+                        }
+                      })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

@@ -117,8 +117,11 @@ const ContractForms = () => {
   const [motorcycles, setMotorcycles] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [purchaseContracts, setPurchaseContracts] = useState([]);
   const [selectedMotorcycle, setSelectedMotorcycle] = useState(null);
   const [selectedParty, setSelectedParty] = useState(null);
+  const [selectedPurchaseContract, setSelectedPurchaseContract] =
+    useState(null);
 
   useEffect(() => {
     fetchData();
@@ -129,25 +132,36 @@ const ContractForms = () => {
 
   const fetchData = async () => {
     try {
+      // Don't fetch all purchase contracts upfront - fetch only when needed
+      // This prevents timeout issues when there are many contracts
       const [bikesRes, customersRes, suppliersRes] = await Promise.all([
-        axios.get("/api/motorcycles"),
-        axios.get("/api/customers"),
-        axios.get("/api/suppliers"),
+        axios.get("/api/motorcycles", { timeout: 30000 }),
+        axios.get("/api/customers", { timeout: 30000 }),
+        axios.get("/api/suppliers", { timeout: 30000 }),
       ]);
 
       setMotorcycles(bikesRes.data || []);
       setCustomers(customersRes.data || []);
       setSuppliers(suppliersRes.data || []);
+      // Don't fetch purchase contracts here - fetch only when motorcycle is selected
+      setPurchaseContracts([]);
 
       if (motorcycleId) {
         const bike = bikesRes.data.find((m) => m.id === motorcycleId);
         if (bike) {
           setSelectedMotorcycle(bike);
           updateMotorcycleFields(bike);
+          // Auto-fill from motorcycle if it's in stock
+          if (contractType === "sale" && bike.status === "in_stock") {
+            await loadMotorcycleData(bike);
+          }
         }
       }
     } catch (error) {
       console.error("Error fetching data:", error);
+      if (error.code === "ECONNABORTED") {
+        alert("Ombi limechelewa. Tafadhali jaribu tena.");
+      }
     }
   };
 
@@ -209,7 +223,194 @@ const ContractForms = () => {
       motorcycleEngineNumber: motorcycle.engineNumber,
       motorcycleChassisNumber: motorcycle.chassisNumber,
       motorcycleColor: motorcycle.color,
+      // Auto-fill selling price for sale contracts
+      salePrice:
+        contractType === "sale" && motorcycle.sellingPrice
+          ? motorcycle.sellingPrice.toString()
+          : prev.salePrice,
     }));
+  };
+
+  // Load purchase contract data and auto-fill previous owner info
+  const loadMotorcycleData = async (motorcycle) => {
+    try {
+      console.log(
+        "🔍 Loading motorcycle data for:",
+        motorcycle.id,
+        motorcycle.chassisNumber
+      );
+
+      // Find purchase contract for this motorcycle
+      let purchaseContract = purchaseContracts.find(
+        (c) => c.motorcycleId === motorcycle.id && c.type === "purchase"
+      );
+
+      console.log(
+        "📋 Purchase contract from cache:",
+        purchaseContract ? purchaseContract.contractNumber : "Not found"
+      );
+
+      // If not found in cached contracts, try fetching directly by motorcycleId
+      if (!purchaseContract) {
+        try {
+          console.log(
+            "🔎 Fetching purchase contract from API by motorcycleId..."
+          );
+          const contractsRes = await axios.get(
+            `/api/contracts?type=purchase&motorcycleId=${motorcycle.id}`
+          );
+          const contracts = contractsRes.data || [];
+          console.log("📦 Contracts found by motorcycleId:", contracts.length);
+          purchaseContract = contracts.find(
+            (c) => c.motorcycleId === motorcycle.id
+          );
+          if (purchaseContract) {
+            console.log(
+              "✅ Found purchase contract:",
+              purchaseContract.contractNumber
+            );
+            setPurchaseContracts((prev) => [...prev, purchaseContract]);
+          }
+        } catch (e) {
+          console.error(
+            "❌ Could not fetch purchase contract by motorcycleId:",
+            e
+          );
+        }
+      }
+
+      // If still not found, try to find by matching chassis/engine number using optimized search endpoint
+      // This handles cases where contract was created before motorcycle was linked
+      if (!purchaseContract) {
+        try {
+          console.log(
+            "🔎 Trying to find purchase contract by chassis/engine number..."
+          );
+          // Use optimized search endpoint instead of fetching all contracts
+          const searchRes = await axios.get(
+            `/api/contracts/search/by-motorcycle`,
+            {
+              params: {
+                chassisNumber: motorcycle.chassisNumber,
+                engineNumber: motorcycle.engineNumber,
+                type: "purchase",
+              },
+              timeout: 30000, // 30 seconds should be enough for a single search
+            }
+          );
+          purchaseContract = searchRes.data || null;
+          console.log(
+            purchaseContract
+              ? `✅ Found purchase contract: ${purchaseContract.contractNumber}`
+              : "⚠️ No purchase contract found by chassis/engine number"
+          );
+
+          if (purchaseContract) {
+            // Update contract with motorcycleId if it doesn't have it
+            if (!purchaseContract.motorcycleId) {
+              console.log("🔗 Linking contract to motorcycle...");
+              try {
+                await axios.put(`/api/contracts/${purchaseContract.id}`, {
+                  motorcycleId: motorcycle.id,
+                });
+                purchaseContract.motorcycleId = motorcycle.id;
+                console.log("✅ Contract linked to motorcycle successfully");
+              } catch (e) {
+                console.warn("⚠️ Could not link contract to motorcycle:", e);
+              }
+            }
+            // Cache the contract for future use
+            setPurchaseContracts((prev) => {
+              if (!prev.find((c) => c.id === purchaseContract.id)) {
+                return [...prev, purchaseContract];
+              }
+              return prev;
+            });
+          } else {
+            console.log(
+              "⚠️ No purchase contract found even after searching by chassis/engine number"
+            );
+            console.log(
+              "💡 This motorcycle might not have a purchase contract yet"
+            );
+          }
+        } catch (e) {
+          console.error("❌ Could not search purchase contracts:", e);
+        }
+      }
+
+      if (purchaseContract) {
+        setSelectedPurchaseContract(purchaseContract);
+        console.log("📝 Purchase contract notes:", purchaseContract.notes);
+
+        // Parse notes to get previous owner info
+        let notesData = {};
+        try {
+          notesData =
+            typeof purchaseContract.notes === "string"
+              ? JSON.parse(purchaseContract.notes)
+              : purchaseContract.notes || {};
+          console.log("📄 Parsed notes data:", notesData);
+        } catch (e) {
+          console.warn("⚠️ Could not parse contract notes:", e);
+          console.log("Raw notes:", purchaseContract.notes);
+        }
+
+        const previousOwner = notesData.previousOwner || {};
+        const broughtBy = notesData.broughtBy || {};
+
+        console.log("👤 Previous owner data:", previousOwner);
+        console.log("🚗 Brought by data:", broughtBy);
+
+        // Auto-fill previous owner info
+        setFormData((prev) => ({
+          ...prev,
+          previousOwnerName: previousOwner.name || "",
+          previousOwnerContact: previousOwner.contact || "",
+          previousOwnerTIN: previousOwner.tin || "",
+          previousOwnerIdType: previousOwner.idType || "",
+          previousOwnerIdNumber: previousOwner.idNumber || "",
+          previousOwnerAddress: previousOwner.address || "",
+          previousOwnerOccupation: previousOwner.occupation || "",
+          previousOwnerPhoto: previousOwner.photo || null,
+          broughtByName: broughtBy.name || "",
+          broughtByContact: broughtBy.contact || "",
+          broughtByAddress: broughtBy.address || "",
+          broughtByOccupation: broughtBy.occupation || "",
+          broughtByRelationship: broughtBy.relationship || "",
+          broughtByIdType: broughtBy.idType || "",
+          broughtByIdNumber: broughtBy.idNumber || "",
+          broughtByPhoto: broughtBy.photo || null,
+        }));
+
+        console.log(
+          "✅ Auto-filled form data with previous owner and broughtBy info"
+        );
+
+        // Show success message if data was filled
+        if (previousOwner.name || broughtBy.name) {
+          console.log(
+            "✅ Taarifa za mmiliki wa awali na mtu aliyeleta zimejaza kiotomatiki"
+          );
+        } else {
+          console.warn(
+            "⚠️ Purchase contract ilipatikana lakini haina taarifa za mmiliki wa awali au mtu aliyeleta"
+          );
+        }
+      } else {
+        console.log(
+          "⚠️ No purchase contract found. Taarifa za mmiliki wa awali hazitajijaza kiotomatiki."
+        );
+        // Show user-friendly message
+        if (contractType === "sale") {
+          console.warn(
+            "ℹ️ Pikipiki hii haina mkataba wa kununua ulio-link. Taarifa za mmiliki wa awali hazitajijaza kiotomatiki."
+          );
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error loading motorcycle purchase data:", error);
+    }
   };
 
   const updatePartyFields = (party) => {
@@ -224,11 +425,18 @@ const ContractForms = () => {
     }));
   };
 
-  const handleMotorcycleChange = (motorcycleId) => {
+  const handleMotorcycleChange = async (motorcycleId) => {
     const motorcycle = motorcycles.find((m) => m.id === motorcycleId);
     if (motorcycle) {
       setSelectedMotorcycle(motorcycle);
+      // Update motorcycle fields first
       updateMotorcycleFields(motorcycle);
+
+      // For sale contracts, load purchase contract data if motorcycle is in stock
+      // This will auto-fill previous owner and broughtBy info
+      if (contractType === "sale" && motorcycle.status === "in_stock") {
+        await loadMotorcycleData(motorcycle);
+      }
     }
   };
 
@@ -787,6 +995,40 @@ const ContractForms = () => {
             </div>
           </div>
 
+          {/* Motorcycle Selection (for Sale Contracts) */}
+          {contractType === "sale" && (
+            <div className="border-b pb-4 mb-4">
+              <h4 className="font-semibold mb-3">
+                Chagua Pikipiki kutoka Stock
+              </h4>
+              <div className="mb-4">
+                <Select
+                  label="Chagua Pikipiki"
+                  value={selectedMotorcycle?.id || ""}
+                  onChange={(e) => handleMotorcycleChange(e.target.value)}
+                  options={[
+                    { value: "", label: "Chagua pikipiki kutoka stock..." },
+                    ...motorcycles
+                      .filter((m) => m.status === "in_stock")
+                      .map((m) => ({
+                        value: m.id,
+                        label: `${m.brand} ${m.model} - ${m.chassisNumber} (Stock)`,
+                      })),
+                  ]}
+                />
+                {selectedPurchaseContract && (
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800">
+                      <strong>✓</strong> Taarifa za mmiliki wa awali zimejaza
+                      kiotomatiki kutoka kwenye mkataba wa kununua:{" "}
+                      <strong>{selectedPurchaseContract.contractNumber}</strong>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Motorcycle Information */}
           <div className="border-b pb-4 mb-4">
             <h4 className="font-semibold mb-3">Taarifa za Pikipiki</h4>
@@ -800,6 +1042,16 @@ const ContractForms = () => {
                     motorcycleRegistration: e.target.value,
                   })
                 }
+                disabled={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                }
+                className={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                    ? "bg-gray-100"
+                    : ""
+                }
               />
               <Input
                 label="Aina (Brand/Model)"
@@ -808,6 +1060,16 @@ const ContractForms = () => {
                   setFormData({ ...formData, motorcycleType: e.target.value })
                 }
                 required
+                disabled={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                }
+                className={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                    ? "bg-gray-100"
+                    : ""
+                }
               />
               <Input
                 label="Mwaka"
@@ -820,6 +1082,16 @@ const ContractForms = () => {
                   })
                 }
                 required
+                disabled={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                }
+                className={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                    ? "bg-gray-100"
+                    : ""
+                }
               />
               <Input
                 label="Engine Number"
@@ -831,6 +1103,16 @@ const ContractForms = () => {
                   })
                 }
                 required
+                disabled={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                }
+                className={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                    ? "bg-gray-100"
+                    : ""
+                }
               />
               <Input
                 label="Chassis Number"
@@ -842,6 +1124,16 @@ const ContractForms = () => {
                   })
                 }
                 required
+                disabled={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                }
+                className={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                    ? "bg-gray-100"
+                    : ""
+                }
               />
               <Input
                 label="Rangi"
@@ -850,6 +1142,16 @@ const ContractForms = () => {
                   setFormData({ ...formData, motorcycleColor: e.target.value })
                 }
                 required
+                disabled={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                }
+                className={
+                  contractType === "sale" &&
+                  selectedMotorcycle?.status === "in_stock"
+                    ? "bg-gray-100"
+                    : ""
+                }
               />
             </div>
           </div>
@@ -1500,6 +1802,162 @@ const ContractForms = () => {
               </div>
             )}
 
+            {/* Motorcycle Details - Kwanza */}
+            <div className="border-t pt-4">
+              <p className="font-semibold mb-2">
+                PIKIPIKI YENYE TAARIFA ZIFUATAZO
+              </p>
+              <div className="grid grid-cols-2 gap-4 pl-4">
+                <div>
+                  <p>
+                    <strong>USAJILI</strong>{" "}
+                    {formData.motorcycleRegistration || "____________________"}
+                  </p>
+                  <p>
+                    <strong>AINA</strong>{" "}
+                    {formData.motorcycleType || "____________________"}
+                  </p>
+                  <p>
+                    <strong>MWAKA</strong>{" "}
+                    {formData.motorcycleYear || "____________________"}
+                  </p>
+                </div>
+                <div>
+                  <p>
+                    <strong>ENGINE NUMBER</strong>{" "}
+                    {formData.motorcycleEngineNumber || "____________________"}
+                  </p>
+                  <p>
+                    <strong>CHASIS NUMBER</strong>{" "}
+                    {formData.motorcycleChassisNumber || "____________________"}
+                  </p>
+                  <p>
+                    <strong>RANGI</strong>{" "}
+                    {formData.motorcycleColor || "____________________"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Previous Owner Section (for sale contracts) - Pili */}
+            {contractType === "sale" && (
+              <div className="border-t pt-4 mt-4">
+                <p className="font-semibold mb-3 text-base">
+                  PIKIPIKI AMBAYO IMENUNULIWA/KUTOKA KWA
+                </p>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <strong>JINA</strong>{" "}
+                      {formData.previousOwnerName || "____________________"}
+                    </p>
+                    <p>
+                      <strong>MAWASILIANO</strong>{" "}
+                      {formData.previousOwnerContact || "____________________"}
+                    </p>
+                    <p>
+                      <strong>TIN NUMBER</strong>{" "}
+                      {formData.previousOwnerTIN || "____________________"}
+                    </p>
+                    <p>
+                      <strong>AINA YA KITAMBULISHO</strong>{" "}
+                      {formData.previousOwnerIdType || "____________________"}
+                    </p>
+                    <p>
+                      <strong>NAMBA ZA KITAMBULISHO</strong>{" "}
+                      {formData.previousOwnerIdNumber || "____________________"}
+                    </p>
+                    <p>
+                      <strong>MAKAZI YAKE</strong>{" "}
+                      {formData.previousOwnerAddress || "____________________"}
+                    </p>
+                    <p>
+                      <strong>KAZI</strong>{" "}
+                      {formData.previousOwnerOccupation ||
+                        "____________________"}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <p className="font-semibold mb-2 text-sm text-center">
+                      PICHA YA MMLIKI WA AWALI
+                    </p>
+                    <div className="border-2 border-dashed border-gray-400 h-40 w-32 flex items-center justify-center bg-gray-50">
+                      {formData.previousOwnerPhoto ? (
+                        <img
+                          src={formData.previousOwnerPhoto}
+                          alt="Previous Owner"
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-xs text-center px-2">
+                          (ibandikwe hapa)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Person who brought/referred Section (for sale contracts) - Tatu */}
+            {contractType === "sale" && (
+              <div className="border-t pt-4 mt-4">
+                <p className="font-semibold mb-3 text-base">
+                  AMBAYE AMELETWA/KAELEKEZWA KWA MR PIKIPIKI TRADING NA
+                </p>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <strong>JINA</strong>{" "}
+                      {formData.broughtByName || "____________________"}
+                    </p>
+                    <p>
+                      <strong>MAWASILIANO</strong>{" "}
+                      {formData.broughtByContact || "____________________"}
+                    </p>
+                    <p>
+                      <strong>MAKAZI</strong>{" "}
+                      {formData.broughtByAddress || "____________________"}
+                    </p>
+                    <p>
+                      <strong>KAZI YAKE</strong>{" "}
+                      {formData.broughtByOccupation || "____________________"}
+                    </p>
+                    <p>
+                      <strong>UHUSIANO NA MMLIKI</strong>{" "}
+                      {formData.broughtByRelationship || "____________________"}
+                    </p>
+                    <p>
+                      <strong>AINA YA KITAMBULISHO</strong>{" "}
+                      {formData.broughtByIdType || "____________________"}
+                    </p>
+                    <p>
+                      <strong>NAMBA ZA KITAMBULISHO</strong>{" "}
+                      {formData.broughtByIdNumber || "____________________"}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <p className="font-semibold mb-2 text-sm text-center">
+                      PICHA YA MWAKILISHI/DALALI/ALIYEMALIZA MKATABA
+                    </p>
+                    <div className="border-2 border-dashed border-gray-400 h-40 w-32 flex items-center justify-center bg-gray-50">
+                      {formData.broughtByPhoto ? (
+                        <img
+                          src={formData.broughtByPhoto}
+                          alt="Brought By"
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-xs text-center px-2">
+                          (ibandikwe hapa)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Person who brought/referred Section (for purchase contracts) */}
             {contractType === "purchase" && (
               <div className="border-t pt-4 mt-4">
@@ -1559,43 +2017,6 @@ const ContractForms = () => {
               </div>
             )}
 
-            {/* Motorcycle Details */}
-            <div className="border-t pt-4">
-              <p className="font-semibold mb-2">
-                PIKIPIKI YENYE TAARIFA ZIFUATAZO
-              </p>
-              <div className="grid grid-cols-2 gap-4 pl-4">
-                <div>
-                  <p>
-                    <strong>USAJILI</strong>{" "}
-                    {formData.motorcycleRegistration || "____________________"}
-                  </p>
-                  <p>
-                    <strong>AINA</strong>{" "}
-                    {formData.motorcycleType || "____________________"}
-                  </p>
-                  <p>
-                    <strong>MWAKA</strong>{" "}
-                    {formData.motorcycleYear || "____________________"}
-                  </p>
-                </div>
-                <div>
-                  <p>
-                    <strong>ENGINE NUMBER</strong>{" "}
-                    {formData.motorcycleEngineNumber || "____________________"}
-                  </p>
-                  <p>
-                    <strong>CHASIS NUMBER</strong>{" "}
-                    {formData.motorcycleChassisNumber || "____________________"}
-                  </p>
-                  <p>
-                    <strong>RANGI</strong>{" "}
-                    {formData.motorcycleColor || "____________________"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
             {/* Terms and Conditions Section */}
             <div className="border-t pt-4">
               <p className="font-semibold mb-2">
@@ -1603,97 +2024,135 @@ const ContractForms = () => {
               </p>
               <div className="pl-4 space-y-2 text-sm">
                 <p>
-                  <strong>1 (a)</strong> Bei ya pikipiki ni Shilingi{" "}
-                  {formData.salePrice || "____________________"}, kiasi
-                  kilicholipwa ni Shilingi{" "}
-                  {formData.amountPaid || "____________________"}, deni ni
-                  Shilingi {formData.remainingBalance || "____________________"}{" "}
-                  na sababu ya deni ni{" "}
-                  {formData.balanceReason || "____________________"}
+                  <strong>1 (a)</strong> Pikipiki tajwa itauzwa kwa bei ya
+                  shilingi{" "}
+                  {formData.salePrice
+                    ? parseFloat(formData.salePrice).toLocaleString()
+                    : "____________________"}
                 </p>
                 <p>
-                  <strong>[b]</strong> Mnunuzi anakubali kununua pikipiki hii
-                  kwa hali yake ya sasa kama ilivyokubaliana.
+                  <strong>(b)</strong> Mnunuzi anakubali kununua pikipiki tajwa
+                  katika hali iliyokuwa nayo na ambayo amekubaliana nayo
                 </p>
                 <p>
-                  <strong>[c]</strong> Mnunuzi atalipa gharama zote za
-                  uhamishaji wa umiliki wa pikipiki ikiwa ni pamoja na kodi
-                  zote.
+                  <strong>(c)</strong> Mnunuzi anakubali kubeba gharama za
+                  kuhamisha umiliki Pamoja na kodi zote
                 </p>
                 <p>
-                  <strong>[d]</strong> Ofisi itampa muuzaji muda wa siku 7
-                  kuanzia tarehe ya kusaini mkataba huu kutoa taarifa zote
-                  muhimu kwa TRA kwa ajili ya uhamishaji wa umiliki wa pikipiki.
+                  <strong>(d)</strong> OFISI ITATOA MUDA WA SIKU THELASINI (30)
+                  TU KUTOKA SIKU YA KUSAINIWA KWA MKATABA HUU KWA MNUNUZI
+                  KUBADILISHA UMILIKI WA PIKIPIKI TAJWA PAMOJA NA KODI ZOTE.
                 </p>
                 <p>
-                  <strong>[e]</strong> Ofisi haitakuwa na jukumu la matumizi ya
-                  pikipiki kabla ya tarehe ya kusaini mkataba huu.
+                  <strong>(e)</strong> Ofisi haitahusika katika namna yoyote kwa
+                  matumizi ya pikipiki baada ya tarehe ya kusainiwa kwa mkataba
+                  huu
                 </p>
                 <p>
-                  <strong>[f]</strong> Muuzaji atakuwa na jukumu la makosa au
-                  matatizo yoyote yanayohusiana na pikipiki yaliyotokea kabla ya
-                  tarehe ya kusaini mkataba huu.
+                  <strong>(f)</strong> Mnunuzi atawajibika kwa makosa yoyote
+                  yatakayo fanyika/ kutendeka na pikipiki tajwa katika kipindi
+                  chote ambacho hajabadilisha umiliki baada ya tarehe ya
+                  kusainiwa kwa mkataba huu.
                 </p>
                 <p>
-                  <strong>[g]</strong> Muuzaji anathibitisha kuwa pikipiki hii
-                  ni mali yake halali, alipata kisheria, na ana mamlaka kamili
-                  ya kuiuza kama mmiliki au mwakilishi wake. Yuko tayari
-                  kuchukua jukumu la matatizo yoyote yanaweza kutokea.
+                  <strong>(g)</strong> Ofisi itaendelea kuwa mshauri wa karibu
+                  (kama ikihitajika) katika masuala ya kiufundi katika pikipiki
+                  tajwa hapo juu baada ya tarehe ya kusainiwa kwa mkataba huu.
                 </p>
                 <p>
-                  <strong>[h]</strong> Muuzaji anathibitisha kuwa atatoa
-                  viambatanisho vyote vinavyohitajika kwa TRA kisheria mkataba
-                  huu.
+                  <strong>(h)</strong> Pikipiki ikiuzwa hairudishwi
                 </p>
                 <p>
-                  <strong>[I]</strong> Mashahidi wa muuzaji wanathibitisha
-                  kumjua muuzaji na wako tayari kuchukua jukumu la matatizo
-                  yoyote yanaweza kutokea. Pia wako tayari kushirikiana na
-                  kuchukua jukumu kulingana na sheria za nchi.
+                  <strong>2 (a)</strong> Ofisi itawajibika kutoa viambatanisho
+                  vinavyohitajika kwa muongozo wa mamlaka ya mapato Tanzania
+                  (TRA) ili kubadilisha umiliki wa pikipiki tajwa hapo juu
                 </p>
                 <p>
-                  <strong>[j]</strong> Mkataba huu utafanywa na kutafsiriwa
-                  kulingana na sheria za Jamhuri ya Muungano wa Tanzania.
+                  <strong>(b)</strong> Pikipiki zote zilizonunuliwa kutoka
+                  kwenye kampuni, mnunuzi atawajibika kutoa viambatanisho vyake
+                  vinavyohitajika ili kubadilisha umiliki na ofisi itawajibika
+                  kushughulikia taratibu za kuhamisha umiliki kwa gharama za
+                  mnunuzi (kama ilivyokubaliwa katika kipengele 1:c)
                 </p>
                 <p>
-                  <strong>[k]</strong> Mnunuzi, muuzaji, na mashahidi
-                  wanathibitisha kuwa wamesoma, wameelewa, na wamekubaliana na
-                  masharti ya mkataba huu kabla ya kusaini.
+                  <strong>(c)</strong> Ofisi inawajibika kuthibitisha usalama wa
+                  pikipiki tajwa hapo juu ambayo imenunuliwa katika KAMPUNI/MTU
+                  BINAFSI ambaye/ambazo taarifa zake zimeanishwa hapo juu.
+                </p>
+                <p>
+                  <strong>(d)</strong> Ofisi itahakikisha kutoa taarifa
+                  ilizopewa na mmliki wa awali (kama ikihitajika) kuhusu
+                  pikipiki KATIKA KIPINDI CHA SIKU 30 TU (mwezi mmoja) kutoka
+                  tarehe ya kusainiwa kwa mkataba huu ambazo zitahusisha
+                  MAWASILIANO, KITAMBULISHO, PICHA YA PASSPORT, NAMBA YA
+                  UTAMBULISHO WA MLIPAKODI (TIN). (ISIPOKUWA KWA PIKIPIKI ZENYE
+                  UMILIKI WA KAMPUNI AU UBIA NA KAMPUNI)
+                </p>
+                <p>
+                  <strong>(e)</strong> Mnunuzi anatambua kuwa ofisi inasamama
+                  kama daraja kati yake (mnunuzi) na mmliki wa awali ambaye
+                  taarifa zake zimetajwa, hivyo ofisi haiwajibiki kubadili
+                  umiliki wa pikipiki kuwa katika umiliki wake (ofisi) kabla ya
+                  kuuza kwa mnunuzi
+                </p>
+                <p>
+                  <strong>(f)</strong> Mkataba huu utaendeshwa na kutafsiriwa
+                  kwa mujibu wa sheria za nchi ya jamuhuri ya muuangano wa
+                  Tanzania
+                </p>
+                <p>
+                  <strong>(g)</strong> Mnunuzi na muuzaji wanakiri kusoma,
+                  kuelewa na kuridhia masharti ya mkataba huu kabla ya tarehe ya
+                  kusainiwa.
                 </p>
               </div>
             </div>
 
-            {/* Seller's Witness Section */}
+            {/* Seller Section */}
             <div className="border-t pt-4">
               <p className="font-semibold mb-2">1: MUUZAJI</p>
               <div className="pl-4 space-y-2">
                 <p>
                   <strong>JINA</strong>{" "}
-                  {formData.partyName || "____________________"}
+                  {contractType === "sale"
+                    ? "MR PIKIPIKI TRADING"
+                    : formData.partyName || "____________________"}
                 </p>
                 <p>
                   <strong>NAMBA YA SIMU</strong>{" "}
-                  {formData.partyPhone || "____________________"}
+                  {contractType === "sale"
+                    ? formData.companyPhone
+                    : formData.partyPhone || "____________________"}
                 </p>
                 <p>
                   <strong>MAKAZI</strong>{" "}
-                  {formData.partyAddress || "____________________"}
+                  {contractType === "sale"
+                    ? formData.companyAddress
+                    : formData.partyAddress || "____________________"}
                 </p>
-                <p>
-                  <strong>AINA YA KITAMBULISHO</strong>{" "}
-                  {formData.partyIdType || "____________________"}
-                </p>
-                <p>
-                  <strong>NAMBA ZA KITAMBULISHO</strong>{" "}
-                  {formData.partyIdNumber || "____________________"}
-                </p>
+                {contractType === "purchase" && (
+                  <>
+                    <p>
+                      <strong>AINA YA KITAMBULISHO</strong>{" "}
+                      {formData.partyIdType || "____________________"}
+                    </p>
+                    <p>
+                      <strong>NAMBA ZA KITAMBULISHO</strong>{" "}
+                      {formData.partyIdNumber || "____________________"}
+                    </p>
+                  </>
+                )}
                 <p>
                   <strong>KAZI</strong>{" "}
-                  {formData.partyOccupation || "____________________"}
+                  {contractType === "purchase"
+                    ? formData.partyOccupation || "____________________"
+                    : "Muuzaji"}
                 </p>
                 <p>
                   <strong>SAHIHI</strong>{" "}
-                  {formData.partyName
+                  {contractType === "sale"
+                    ? "____________________"
+                    : formData.partyName
                     ? "____________________"
                     : "____________________"}
                 </p>
@@ -1702,7 +2161,7 @@ const ContractForms = () => {
 
             {/* Seller's Witness 1 */}
             <div className="border-t pt-4">
-              <p className="font-semibold mb-2">2: SHAHIDI WA MUUZAJI [1]</p>
+              <p className="font-semibold mb-2">2: SHAHIDI WA MUUZAJI</p>
               <div className="pl-4 space-y-2">
                 <p>
                   <strong>JINA</strong>{" "}
@@ -1735,44 +2194,49 @@ const ContractForms = () => {
               </div>
             </div>
 
-            {/* Seller's Witness 2 */}
-            <div className="border-t pt-4">
-              <p className="font-semibold mb-2">3: SHAHIDI WA MUUZAJI [2]</p>
-              <div className="pl-4 space-y-2">
-                <p>
-                  <strong>JINA</strong>{" "}
-                  {formData.sellerWitness2Name || "____________________"}
-                </p>
-                <p>
-                  <strong>NAMBA YA SIMU</strong>{" "}
-                  {formData.sellerWitness2Phone || "____________________"}
-                </p>
-                <p>
-                  <strong>MAKAZI</strong>{" "}
-                  {formData.sellerWitness2Address || "____________________"}
-                </p>
-                <p>
-                  <strong>AINA YA KITAMBULISHO</strong>{" "}
-                  {formData.sellerWitness2IdType || "____________________"}
-                </p>
-                <p>
-                  <strong>NAMBA ZA KITAMBULISHO</strong>{" "}
-                  {formData.sellerWitness2IdNumber || "____________________"}
-                </p>
-                <p>
-                  <strong>KAZI</strong>{" "}
-                  {formData.sellerWitness2Occupation || "____________________"}
-                </p>
-                <p>
-                  <strong>SAHIHI</strong>{" "}
-                  {formData.sellerWitness2Signature || "____________________"}
-                </p>
+            {/* Seller's Witness 2 - Only show for purchase contracts */}
+            {contractType === "purchase" && (
+              <div className="border-t pt-4">
+                <p className="font-semibold mb-2">3: SHAHIDI WA MUUZAJI [2]</p>
+                <div className="pl-4 space-y-2">
+                  <p>
+                    <strong>JINA</strong>{" "}
+                    {formData.sellerWitness2Name || "____________________"}
+                  </p>
+                  <p>
+                    <strong>NAMBA YA SIMU</strong>{" "}
+                    {formData.sellerWitness2Phone || "____________________"}
+                  </p>
+                  <p>
+                    <strong>MAKAZI</strong>{" "}
+                    {formData.sellerWitness2Address || "____________________"}
+                  </p>
+                  <p>
+                    <strong>AINA YA KITAMBULISHO</strong>{" "}
+                    {formData.sellerWitness2IdType || "____________________"}
+                  </p>
+                  <p>
+                    <strong>NAMBA ZA KITAMBULISHO</strong>{" "}
+                    {formData.sellerWitness2IdNumber || "____________________"}
+                  </p>
+                  <p>
+                    <strong>KAZI</strong>{" "}
+                    {formData.sellerWitness2Occupation ||
+                      "____________________"}
+                  </p>
+                  <p>
+                    <strong>SAHIHI</strong>{" "}
+                    {formData.sellerWitness2Signature || "____________________"}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Buyer Section */}
             <div className="border-t pt-4">
-              <p className="font-semibold mb-2">3: MNUNUZI</p>
+              <p className="font-semibold mb-2">
+                {contractType === "sale" ? "3: MNUNUZI" : "3: MNUNUZI"}
+              </p>
               <div className="pl-4 space-y-2">
                 <p>
                   <strong>JINA</strong>{" "}

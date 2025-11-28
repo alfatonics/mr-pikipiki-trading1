@@ -47,17 +47,35 @@ const generateContractNumber = async (type) => {
 // Get all contracts
 router.get("/", authenticate, async (req, res) => {
   try {
-    const { type, status } = req.query;
+    const { type, status, motorcycleId } = req.query;
     const filter = {};
 
     if (type) filter.type = type;
     if (status) filter.status = status;
+    if (motorcycleId) filter.motorcycleId = motorcycleId;
+
+    // Check if we need minimal data (for BikeForInspection page)
+    const minimal = req.query.minimal === "true";
+
+    if (minimal) {
+      // For BikeForInspection, return contracts with basic data only (no full population)
+      // Limit to 500 contracts to prevent timeout
+      filter.limit = 500;
+      const contracts = await Contract.findAll(filter);
+      res.json(contracts);
+      return;
+    }
 
     const contracts = await Contract.findAll(filter);
 
-    // Populate party and motorcycle data for each contract
+    // Limit population to prevent timeout - only populate first 100 contracts
+    // If more are needed, implement pagination
+    const contractsToPopulate = contracts.slice(0, 100);
+    const remainingContracts = contracts.slice(100);
+
+    // Populate party and motorcycle data for contracts (limited to prevent timeout)
     const populatedContracts = await Promise.all(
-      contracts.map(async (contract) => {
+      contractsToPopulate.map(async (contract) => {
         const populated = { ...contract };
 
         // Get motorcycle data
@@ -97,10 +115,108 @@ router.get("/", authenticate, async (req, res) => {
       })
     );
 
-    res.json(populatedContracts);
+    // Add remaining contracts without full population
+    const allContracts = [...populatedContracts, ...remainingContracts];
+
+    res.json(allContracts);
   } catch (error) {
     console.error("Contracts API error:", error);
     res.status(500).json({ error: "Failed to fetch contracts" });
+  }
+});
+
+// Search contract by motorcycle chassis/engine number (optimized for large datasets)
+router.get("/search/by-motorcycle", authenticate, async (req, res) => {
+  try {
+    const { chassisNumber, engineNumber, type = "purchase" } = req.query;
+
+    if (!chassisNumber && !engineNumber) {
+      return res.status(400).json({
+        error: "Either chassisNumber or engineNumber is required",
+      });
+    }
+
+    // Use direct SQL query for better performance
+    let sql = `
+      SELECT c.id, c.contract_number as "contractNumber", c.type, c.motorcycle_id as "motorcycleId",
+             c.party_id as "partyId", c.party_model as "partyModel", c.amount, c.currency,
+             c.date, c.effective_date as "effectiveDate", c.expiry_date as "expiryDate",
+             c.payment_method as "paymentMethod", c.status, c.priority,
+             c.rama_inspection_status as "ramaInspectionStatus",
+             c.notes, c.internal_notes as "internalNotes",
+             c.created_at as "createdAt", c.updated_at as "updatedAt",
+             m.chassis_number as "motorcycleChassisNumber",
+             m.engine_number as "motorcycleEngineNumber",
+             m.brand as "motorcycleBrand",
+             m.model as "motorcycleModel"
+      FROM contracts c
+      LEFT JOIN motorcycles m ON c.motorcycle_id = m.id
+      WHERE c.type = $1 AND (
+        (m.chassis_number = $2) OR (m.engine_number = $3)
+        OR (c.notes::text LIKE $4) OR (c.notes::text LIKE $5)
+        OR (c.notes::text LIKE $6) OR (c.notes::text LIKE $7)
+      )
+      ORDER BY c.created_at DESC
+      LIMIT 1
+    `;
+
+    const chassisPattern1 = `%"chassisNumber":"${chassisNumber || ""}"%`;
+    const chassisPattern2 = `%"motorcycleChassisNumber":"${
+      chassisNumber || ""
+    }"%`;
+    const enginePattern1 = `%"engineNumber":"${engineNumber || ""}"%`;
+    const enginePattern2 = `%"motorcycleEngineNumber":"${engineNumber || ""}"%`;
+
+    const result = await query(sql, [
+      type,
+      chassisNumber || null,
+      engineNumber || null,
+      chassisPattern1,
+      chassisPattern2,
+      enginePattern1,
+      enginePattern2,
+    ]);
+
+    const contract = result.rows[0] || null;
+
+    if (contract) {
+      // Populate party data
+      if (contract.partyId && contract.partyModel) {
+        try {
+          if (contract.partyModel === "Customer") {
+            const customer = await Customer.findById(contract.partyId);
+            contract.party = customer || null;
+          } else if (contract.partyModel === "Supplier") {
+            const supplier = await Supplier.findById(contract.partyId);
+            contract.party = supplier || null;
+          }
+        } catch (err) {
+          console.error(`Error fetching party ${contract.partyId}:`, err);
+          contract.party = null;
+        }
+      }
+
+      // Populate motorcycle data
+      if (contract.motorcycleId) {
+        try {
+          const motorcycle = await Motorcycle.findById(contract.motorcycleId);
+          contract.motorcycle = motorcycle || null;
+        } catch (err) {
+          console.error(
+            `Error fetching motorcycle ${contract.motorcycleId}:`,
+            err
+          );
+          contract.motorcycle = null;
+        }
+      }
+
+      contract._id = contract.id;
+    }
+
+    res.json(contract);
+  } catch (error) {
+    console.error("Error searching contract by motorcycle:", error);
+    res.status(500).json({ error: "Failed to search contract" });
   }
 });
 

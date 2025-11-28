@@ -13,6 +13,8 @@ const BikeForInspection = () => {
   const [loading, setLoading] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState(null);
+  const [contractData, setContractData] = useState(null); // Store detailed contract data
+  const [loadingContractData, setLoadingContractData] = useState(false);
   const [filter, setFilter] = useState("pending");
 
   // Determine default filter based on user role
@@ -54,9 +56,12 @@ const BikeForInspection = () => {
       }
 
       // Fetch all inspections and contracts
+      // Optimize: Only fetch purchase contracts with minimal data to reduce data size
       const [inspectionsRes, contractsRes] = await Promise.all([
-        axios.get("/api/inspections"),
-        axios.get("/api/contracts"),
+        axios.get("/api/inspections", { timeout: 30000 }),
+        axios.get("/api/contracts?type=purchase&minimal=true", {
+          timeout: 60000,
+        }), // Fetch with minimal data
       ]);
 
       const allInspections = inspectionsRes.data || [];
@@ -258,9 +263,32 @@ const BikeForInspection = () => {
     }
   };
 
-  const openViewModal = (contract) => {
+  const openViewModal = async (contract) => {
     setSelectedContract(contract);
     setViewModalOpen(true);
+    setContractData(null);
+
+    // Fetch detailed contract data
+    if (contract.id) {
+      try {
+        setLoadingContractData(true);
+        const contractRes = await axios.get(
+          `/api/contracts/${contract.id}/detailed`
+        );
+        const {
+          contract: contractDetails,
+          motorcycle,
+          party,
+        } = contractRes.data;
+        setContractData({ contract: contractDetails, motorcycle, party });
+      } catch (error) {
+        console.error("Error fetching contract details:", error);
+        // Fallback to basic contract data
+        setContractData({ contract, motorcycle: null, party: null });
+      } finally {
+        setLoadingContractData(false);
+      }
+    }
   };
 
   const columns = [
@@ -530,69 +558,336 @@ const BikeForInspection = () => {
         </Card>
       </div>
 
-      {/* View Details Modal */}
+      {/* View Details Modal - Formatted like inspection form */}
       <Modal
         isOpen={viewModalOpen}
         onClose={() => {
           setViewModalOpen(false);
           setSelectedContract(null);
+          setContractData(null);
         }}
-        title="Contract Details"
-        size="lg"
+        title="Taarifa za Mkataba"
+        size="xl"
       >
-        {selectedContract && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+        {loadingContractData ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Inapakia taarifa za mkataba...</p>
+          </div>
+        ) : contractData ? (
+          <div className="space-y-6 max-h-[80vh] overflow-y-auto">
+            {/* Header */}
+            <div className="text-center border-b pb-4">
+              <h2 className="text-xl font-bold mb-2">
+                {contractData.contract?.type === "purchase"
+                  ? "MKATABA WA KUNUNUA PIKIPIKI"
+                  : "MKATABA WA MAUZIANO YA PIKIPIKI"}
+              </h2>
+              <p className="text-sm text-gray-600">
+                Mkataba huu{" "}
+                {contractData.contract?.type === "purchase"
+                  ? "wa kununua"
+                  : "wa kuuza"}{" "}
+                pikipiki unafungwa{" "}
+                {contractData.contract?.date
+                  ? new Date(contractData.contract.date).toLocaleDateString(
+                      "sw-TZ"
+                    )
+                  : "leo"}
+              </p>
+            </div>
+
+            {/* Contract Info */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-sm text-gray-600">Contract Number</p>
-                <p className="font-semibold">
-                  {selectedContract.contractNumber}
+                <p>
+                  <strong>Namba ya Mkataba:</strong>{" "}
+                  {contractData.contract?.contractNumber || "N/A"}
                 </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Type</p>
-                <p className="font-semibold">{selectedContract.type}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Motorcycle</p>
-                <p className="font-semibold">
-                  {selectedContract.motorcycleBrand}{" "}
-                  {selectedContract.motorcycleModel}
+                <p>
+                  <strong>Aina ya Mkataba:</strong>{" "}
+                  {contractData.contract?.type === "purchase"
+                    ? "Kununua"
+                    : "Kuuza"}
                 </p>
-                <p className="text-xs text-gray-500">
-                  Chassis: {selectedContract.motorcycleChassisNumber}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Amount</p>
-                <p className="font-semibold">
-                  {selectedContract.currency || "TZS"}{" "}
-                  {parseFloat(selectedContract.amount || 0).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Date</p>
-                <p className="font-semibold">
-                  {selectedContract.date
-                    ? new Date(selectedContract.date).toLocaleDateString()
+                <p>
+                  <strong>Tarehe:</strong>{" "}
+                  {contractData.contract?.date
+                    ? new Date(contractData.contract.date).toLocaleDateString(
+                        "sw-TZ"
+                      )
                     : "N/A"}
                 </p>
+                <p>
+                  <strong>Hali:</strong>{" "}
+                  {contractData.contract?.status || "N/A"}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Inspection Status</p>
-                <p className="font-semibold">
-                  {selectedContract.ramaInspectionStatus || "pending"}
-                </p>
+                {contractData.party && (
+                  <>
+                    <p>
+                      <strong>
+                        {contractData.contract?.type === "purchase"
+                          ? "Muuzaji"
+                          : "Mnunuzi"}
+                        :
+                      </strong>{" "}
+                      {contractData.party.fullName ||
+                        contractData.party.name ||
+                        "N/A"}
+                    </p>
+                    {contractData.party.phone && (
+                      <p>
+                        <strong>Simu:</strong> {contractData.party.phone}
+                      </p>
+                    )}
+                    {contractData.party.address && (
+                      <p>
+                        <strong>Anwani:</strong> {contractData.party.address}
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
-            {selectedContract.ramaInspectionStatus === "pending" && (
+            {/* Motorcycle Details */}
+            {contractData.motorcycle && (
+              <div className="border-t pt-4">
+                <p className="font-semibold mb-2">
+                  PIKIPIKI YENYE TAARIFA ZIFUATAZO
+                </p>
+                <div className="grid grid-cols-2 gap-4 pl-4 text-sm">
+                  <div>
+                    <p>
+                      <strong>AINA:</strong> {contractData.motorcycle.brand}{" "}
+                      {contractData.motorcycle.model}
+                    </p>
+                    <p>
+                      <strong>MWAKA:</strong>{" "}
+                      {contractData.motorcycle.year || "N/A"}
+                    </p>
+                    <p>
+                      <strong>RANGI:</strong>{" "}
+                      {contractData.motorcycle.color || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <p>
+                      <strong>ENGINE NUMBER:</strong>{" "}
+                      {contractData.motorcycle.engineNumber}
+                    </p>
+                    <p>
+                      <strong>CHASIS NUMBER:</strong>{" "}
+                      {contractData.motorcycle.chassisNumber}
+                    </p>
+                    {contractData.motorcycle.registrationNumber && (
+                      <p>
+                        <strong>USAJILI:</strong>{" "}
+                        {contractData.motorcycle.registrationNumber}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Previous Owner Section (from notes) */}
+            {contractData.contract?.notes &&
+              (() => {
+                try {
+                  const notes =
+                    typeof contractData.contract.notes === "string"
+                      ? JSON.parse(contractData.contract.notes)
+                      : contractData.contract.notes;
+
+                  if (notes.previousOwner) {
+                    return (
+                      <div className="border-t pt-4">
+                        <p className="font-semibold mb-3 text-base">
+                          PIKIPIKI AMBAYO IMENUNULIWA/KUTOKA KWA
+                        </p>
+                        <div className="grid grid-cols-2 gap-6 pl-4 text-sm">
+                          <div className="space-y-2">
+                            <p>
+                              <strong>JINA:</strong>{" "}
+                              {notes.previousOwner.name || "N/A"}
+                            </p>
+                            <p>
+                              <strong>MAWASILIANO:</strong>{" "}
+                              {notes.previousOwner.contact || "N/A"}
+                            </p>
+                            {notes.previousOwner.tin && (
+                              <p>
+                                <strong>TIN NUMBER:</strong>{" "}
+                                {notes.previousOwner.tin}
+                              </p>
+                            )}
+                            {notes.previousOwner.idType && (
+                              <p>
+                                <strong>AINA YA KITAMBULISHO:</strong>{" "}
+                                {notes.previousOwner.idType}
+                              </p>
+                            )}
+                            {notes.previousOwner.idNumber && (
+                              <p>
+                                <strong>NAMBA ZA KITAMBULISHO:</strong>{" "}
+                                {notes.previousOwner.idNumber}
+                              </p>
+                            )}
+                            {notes.previousOwner.address && (
+                              <p>
+                                <strong>MAKAZI YAKE:</strong>{" "}
+                                {notes.previousOwner.address}
+                              </p>
+                            )}
+                            {notes.previousOwner.occupation && (
+                              <p>
+                                <strong>KAZI:</strong>{" "}
+                                {notes.previousOwner.occupation}
+                              </p>
+                            )}
+                          </div>
+                          {notes.previousOwnerPhoto && (
+                            <div className="flex flex-col items-center">
+                              <p className="font-semibold mb-2 text-sm text-center">
+                                PICHA YA MMLIKI WA AWALI
+                              </p>
+                              <div className="border-2 border-dashed border-gray-400 h-40 w-32 flex items-center justify-center bg-gray-50">
+                                <img
+                                  src={notes.previousOwnerPhoto}
+                                  alt="Previous Owner"
+                                  className="max-h-full max-w-full object-contain"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                } catch (e) {
+                  return null;
+                }
+              })()}
+
+            {/* Brought By Section (from notes) */}
+            {contractData.contract?.notes &&
+              (() => {
+                try {
+                  const notes =
+                    typeof contractData.contract.notes === "string"
+                      ? JSON.parse(contractData.contract.notes)
+                      : contractData.contract.notes;
+
+                  const broughtBy = notes.broughtBy;
+                  if (broughtBy) {
+                    const isObject =
+                      typeof broughtBy === "object" && broughtBy !== null;
+
+                    return (
+                      <div className="border-t pt-4">
+                        <p className="font-semibold mb-3 text-base">
+                          AMBAYE AMELETWA/KAELEKEZWA KWA MR PIKIPIKI TRADING NA
+                        </p>
+                        <div className="pl-4 text-sm">
+                          {isObject ? (
+                            <div className="space-y-2">
+                              {broughtBy.name && (
+                                <p>
+                                  <strong>JINA:</strong> {broughtBy.name}
+                                </p>
+                              )}
+                              {broughtBy.contact && (
+                                <p>
+                                  <strong>MAWASILIANO:</strong>{" "}
+                                  {broughtBy.contact}
+                                </p>
+                              )}
+                              {broughtBy.address && (
+                                <p>
+                                  <strong>MAKAZI:</strong> {broughtBy.address}
+                                </p>
+                              )}
+                              {broughtBy.occupation && (
+                                <p>
+                                  <strong>KAZI:</strong> {broughtBy.occupation}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <p>
+                              <strong>JINA:</strong> {String(broughtBy)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                } catch (e) {
+                  return null;
+                }
+              })()}
+
+            {/* Price Information */}
+            {contractData.contract?.amount && (
+              <div className="border-t pt-4">
+                <p className="font-semibold mb-2">TAARIFA ZA MALIPO</p>
+                <div className="pl-4 text-sm space-y-1">
+                  <p>
+                    <strong>Kiasi cha Mkataba:</strong>{" "}
+                    {contractData.contract.amount.toLocaleString()}{" "}
+                    {contractData.contract.currency || "TZS"}
+                  </p>
+                  {contractData.contract.notes &&
+                    (() => {
+                      try {
+                        const notes =
+                          typeof contractData.contract.notes === "string"
+                            ? JSON.parse(contractData.contract.notes)
+                            : contractData.contract.notes;
+
+                        return (
+                          <>
+                            {notes.salePrice && (
+                              <p>
+                                <strong>Bei ya Kuuza:</strong>{" "}
+                                {notes.salePrice.toLocaleString()} TZS
+                              </p>
+                            )}
+                            {notes.amountPaid && (
+                              <p>
+                                <strong>Kiasi Kilicholipwa:</strong>{" "}
+                                {notes.amountPaid.toLocaleString()} TZS
+                              </p>
+                            )}
+                            {notes.remainingBalance && (
+                              <p>
+                                <strong>Salio:</strong>{" "}
+                                {notes.remainingBalance.toLocaleString()} TZS
+                              </p>
+                            )}
+                          </>
+                        );
+                      } catch (e) {
+                        return null;
+                      }
+                    })()}
+                </div>
+              </div>
+            )}
+
+            {/* Verification Buttons */}
+            {selectedContract?.ramaInspectionStatus === "pending" && (
               <div className="mt-6 flex justify-end space-x-3 border-t pt-4">
                 <Button
                   variant="secondary"
                   onClick={() => {
                     setViewModalOpen(false);
                     setSelectedContract(null);
+                    setContractData(null);
                   }}
                 >
                   Funga
@@ -614,6 +909,10 @@ const BikeForInspection = () => {
                 </Button>
               </div>
             )}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Hakuna taarifa za mkataba.</p>
           </div>
         )}
       </Modal>

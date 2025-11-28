@@ -134,6 +134,7 @@ class Contract {
              c.payment_method as "paymentMethod", c.status, c.priority,
              c.rama_inspection_status as "ramaInspectionStatus",
              c.rama_inspected_by as "ramaInspectedBy", c.rama_inspected_at as "ramaInspectedAt",
+             c.notes, c.internal_notes as "internalNotes",
              c.created_at as "createdAt", c.updated_at as "updatedAt",
              m.chassis_number as "motorcycleChassisNumber",
              m.brand as "motorcycleBrand",
@@ -158,6 +159,12 @@ class Contract {
       paramCount++;
     }
 
+    if (filters.motorcycleId) {
+      sql += ` AND c.motorcycle_id = $${paramCount}`;
+      params.push(filters.motorcycleId);
+      paramCount++;
+    }
+
     if (filters.ramaInspectionStatus) {
       sql += ` AND c.rama_inspection_status = $${paramCount}`;
       params.push(filters.ramaInspectionStatus);
@@ -165,6 +172,13 @@ class Contract {
     }
 
     sql += " ORDER BY c.created_at DESC";
+
+    // Add limit if specified in filters (for performance)
+    if (filters.limit) {
+      sql += ` LIMIT $${paramCount}`;
+      params.push(filters.limit);
+      paramCount++;
+    }
 
     const result = await query(sql, params);
     return result.rows;
@@ -183,6 +197,7 @@ class Contract {
       priority: "priority",
       amount: "amount",
       expiryDate: "expiry_date",
+      motorcycleId: "motorcycle_id",
       ramaInspectionStatus: "rama_inspection_status",
       ramaInspectedBy: "rama_inspected_by",
       ramaInspectedAt: "rama_inspected_at",
