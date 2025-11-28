@@ -6,6 +6,7 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import Select from "../components/Select";
+import ImageUploader from "../components/ImageUploader";
 import { FiPrinter, FiSave, FiArrowLeft } from "react-icons/fi";
 
 const SAVE_REQUEST_TIMEOUT = 60000; // allow slower networks to finish multi-step saves
@@ -13,73 +14,6 @@ const MAX_IMAGE_DIMENSION = 1024;
 const IMAGE_COMPRESSION_QUALITY = 0.65;
 
 const normalizeValue = (value) => (value || "").toString().trim().toLowerCase();
-
-const compressImageToDataUrl = (file) => {
-  return new Promise((resolve, reject) => {
-    if (!file || !file.type?.startsWith("image/")) {
-      reject(new Error("Invalid image file"));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
-          const scale = Math.min(
-            MAX_IMAGE_DIMENSION / width,
-            MAX_IMAGE_DIMENSION / height
-          );
-          width = Math.round(width * scale);
-          height = Math.round(height * scale);
-        }
-
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext("2d");
-        context.drawImage(img, 0, 0, width, height);
-        const compressedDataUrl = canvas.toDataURL(
-          "image/jpeg",
-          IMAGE_COMPRESSION_QUALITY
-        );
-        resolve(compressedDataUrl);
-      };
-      img.onerror = () => reject(new Error("Failed to load image"));
-      img.src = event.target.result;
-    };
-    reader.onerror = () => reject(new Error("Failed to read image"));
-    reader.readAsDataURL(file);
-  });
-};
-
-const useImageUploader = (setFormData) => {
-  const handlePhotoUpload = async (event, field) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const compressedData = await compressImageToDataUrl(file);
-      setFormData((prev) => ({
-        ...prev,
-        [field]: compressedData,
-      }));
-    } catch (error) {
-      console.warn("Image compression failed. Using original image.", error);
-      const fallbackReader = new FileReader();
-      fallbackReader.onloadend = () => {
-        setFormData((prev) => ({
-          ...prev,
-          [field]: fallbackReader.result,
-        }));
-      };
-      fallbackReader.readAsDataURL(file);
-    }
-  };
-
-  return handlePhotoUpload;
-};
 
 const ContractForms = () => {
   const [searchParams] = useSearchParams();
@@ -306,8 +240,6 @@ const ContractForms = () => {
       updatePartyFields(party);
     }
   };
-
-  const handlePhotoUpload = useImageUploader(setFormData);
 
   const handlePrint = () => {
     window.print();
@@ -842,14 +774,14 @@ const ContractForms = () => {
                 }
               />
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Picha ya {contractType === "sale" ? "Mnunuzi" : "Muuzaji"}
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handlePhotoUpload(e, "partyPhoto")}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                <ImageUploader
+                  label={`Picha ya ${
+                    contractType === "sale" ? "Mnunuzi" : "Muuzaji"
+                  }`}
+                  value={formData.partyPhoto}
+                  onChange={(imageData) =>
+                    setFormData({ ...formData, partyPhoto: imageData })
+                  }
                 />
               </div>
             </div>
@@ -1006,14 +938,15 @@ const ContractForms = () => {
                   }
                 />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Picha ya Mmiliki wa Awali
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handlePhotoUpload(e, "previousOwnerPhoto")}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  <ImageUploader
+                    label="Picha ya Mmiliki wa Awali"
+                    value={formData.previousOwnerPhoto}
+                    onChange={(imageData) =>
+                      setFormData({
+                        ...formData,
+                        previousOwnerPhoto: imageData,
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -1101,14 +1034,12 @@ const ContractForms = () => {
                   }
                 />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Picha ya Mwakilishi/Dalali
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handlePhotoUpload(e, "broughtByPhoto")}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  <ImageUploader
+                    label="Picha ya Mwakilishi/Dalali"
+                    value={formData.broughtByPhoto}
+                    onChange={(imageData) =>
+                      setFormData({ ...formData, broughtByPhoto: imageData })
+                    }
                   />
                 </div>
               </div>

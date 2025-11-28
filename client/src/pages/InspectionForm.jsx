@@ -6,6 +6,7 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import Select from "../components/Select";
+import ImageUploader from "../components/ImageUploader";
 import { FiPrinter, FiSave, FiArrowLeft, FiCheck, FiX } from "react-icons/fi";
 
 const InspectionForm = () => {
@@ -1107,34 +1108,35 @@ const InspectionForm = () => {
                         </span>
                       )}
                     </p>
-                    <p className="mt-2">
-                      <strong>44. Picha ya passport?</strong>{" "}
+                    <div className="mt-2">
+                      <strong>44. Picha ya passport?</strong>
                       {canEditRamaSection ? (
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                setFormData({
-                                  ...formData,
-                                  sellerPassportImage: event.target.result,
-                                });
-                              };
-                              reader.readAsDataURL(file);
+                        <div className="mt-2">
+                          <ImageUploader
+                            label=""
+                            value={formData.sellerPassportImage}
+                            onChange={(imageData) =>
+                              setFormData({
+                                ...formData,
+                                sellerPassportImage: imageData,
+                              })
                             }
-                          }}
-                        />
+                          />
+                        </div>
                       ) : (
-                        <span className="ml-2">
-                          {formData.sellerPassportImage
-                            ? "✓ Imehifadhiwa"
-                            : "N/A"}
-                        </span>
+                        <div className="mt-2">
+                          {formData.sellerPassportImage ? (
+                            <img
+                              src={formData.sellerPassportImage}
+                              alt="Passport"
+                              className="max-w-xs h-32 object-contain border border-gray-300 rounded"
+                            />
+                          ) : (
+                            <span className="text-gray-400 text-sm">N/A</span>
+                          )}
+                        </div>
                       )}
-                    </p>
+                    </div>
                     <p className="mt-2">
                       <strong>45. Kitambulisho?</strong>
                     </p>
