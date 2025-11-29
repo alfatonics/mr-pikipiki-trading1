@@ -492,6 +492,18 @@ const ContractForms = () => {
       // Validate required fields
       const errors = {};
       const missingFields = [];
+      
+      // Map refs for easy lookup
+      const refMap = {
+        partyName: partyNameRef,
+        partyPhone: partyPhoneRef,
+        partyAddress: partyAddressRef,
+        motorcycleType: motorcycleTypeRef,
+        motorcycleYear: motorcycleYearRef,
+        motorcycleEngineNumber: motorcycleEngineRef,
+        motorcycleChassisNumber: motorcycleChassisRef,
+        motorcycleColor: motorcycleColorRef,
+      };
 
       // Check party fields
       if (!formData.partyName) {
@@ -521,12 +533,15 @@ const ContractForms = () => {
 
         // Scroll to first missing field
         const firstMissingField = missingFields[0].field;
-        if (fieldRefs[firstMissingField]?.current) {
-          fieldRefs[firstMissingField].current.scrollIntoView({
+        const fieldRef = refMap[firstMissingField];
+        if (fieldRef?.current) {
+          fieldRef.current.scrollIntoView({
             behavior: "smooth",
             block: "center",
           });
-          fieldRefs[firstMissingField].current.focus();
+          setTimeout(() => {
+            fieldRef.current?.focus();
+          }, 500);
         }
 
         alert(
@@ -583,12 +598,15 @@ const ContractForms = () => {
 
         // Scroll to first missing motorcycle field
         const firstMissingField = missingMotorcycleFields[0].field;
-        if (fieldRefs[firstMissingField]?.current) {
-          fieldRefs[firstMissingField].current.scrollIntoView({
+        const fieldRef = refMap[firstMissingField];
+        if (fieldRef?.current) {
+          fieldRef.current.scrollIntoView({
             behavior: "smooth",
             block: "center",
           });
-          fieldRefs[firstMissingField].current.focus();
+          setTimeout(() => {
+            fieldRef.current?.focus();
+          }, 500);
         }
 
         alert(
