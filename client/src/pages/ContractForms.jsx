@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,7 @@ import Button from "../components/Button";
 import Input from "../components/Input";
 import Select from "../components/Select";
 import ImageUploader from "../components/ImageUploader";
+import ValidatedInput from "../components/ValidatedInput";
 import { FiPrinter, FiSave, FiArrowLeft } from "react-icons/fi";
 
 const SAVE_REQUEST_TIMEOUT = 60000; // allow slower networks to finish multi-step saves
@@ -24,6 +25,18 @@ const ContractForms = () => {
   const motorcycleId = searchParams.get("motorcycleId");
 
   const [loading, setLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+  
+  // Refs for scrolling to invalid fields
+  const partyNameRef = useRef(null);
+  const partyPhoneRef = useRef(null);
+  const partyAddressRef = useRef(null);
+  const motorcycleTypeRef = useRef(null);
+  const motorcycleYearRef = useRef(null);
+  const motorcycleEngineRef = useRef(null);
+  const motorcycleChassisRef = useRef(null);
+  const motorcycleColorRef = useRef(null);
+  
   const [formData, setFormData] = useState({
     // Company info (MR PIKIPIKI TRADING)
     companyRegistration: "518309",
@@ -477,41 +490,94 @@ const ContractForms = () => {
       }
 
       // Validate required fields
-      if (
-        !formData.partyName ||
-        !formData.partyPhone ||
-        !formData.partyAddress
-      ) {
+      const errors = {};
+      const missingFields = [];
+      
+      // Check party fields
+      if (!formData.partyName) {
+        errors.partyName = true;
+        missingFields.push({ field: "partyName", label: "Jina la Mnunuzi/Muuzaji" });
+      }
+      if (!formData.partyPhone) {
+        errors.partyPhone = true;
+        missingFields.push({ field: "partyPhone", label: "Simu ya Mnunuzi/Muuzaji" });
+      }
+      if (!formData.partyAddress) {
+        errors.partyAddress = true;
+        missingFields.push({ field: "partyAddress", label: "Makazi ya Mnunuzi/Muuzaji" });
+      }
+
+      if (missingFields.length > 0) {
+        setValidationErrors(errors);
+        
+        // Scroll to first missing field
+        const firstMissingField = missingFields[0].field;
+        if (fieldRefs[firstMissingField]?.current) {
+          fieldRefs[firstMissingField].current.scrollIntoView({ 
+            behavior: "smooth", 
+            block: "center" 
+          });
+          fieldRefs[firstMissingField].current.focus();
+        }
+        
         alert(
           "❌ TAARIFA ZA MTEJA/MNUNUZI ZIMEKOSEKANA!\n\n" +
-          "Tafadhali jaza:\n" +
-          (!formData.partyName ? "• Jina la Mnunuzi/Muuzaji\n" : "") +
-          (!formData.partyPhone ? "• Simu ya Mnunuzi/Muuzaji\n" : "") +
-          (!formData.partyAddress ? "• Makazi ya Mnunuzi/Muuzaji\n" : "")
+            "Tafadhali jaza:\n" +
+            missingFields.map(f => `• ${f.label}`).join("\n")
         );
         setLoading(false);
         return;
       }
 
-      if (
-        !formData.motorcycleType ||
-        !formData.motorcycleYear ||
-        !formData.motorcycleEngineNumber ||
-        !formData.motorcycleChassisNumber ||
-        !formData.motorcycleColor
-      ) {
+      // Check motorcycle fields
+      const motorcycleErrors = {};
+      const missingMotorcycleFields = [];
+      
+      if (!formData.motorcycleType) {
+        motorcycleErrors.motorcycleType = true;
+        missingMotorcycleFields.push({ field: "motorcycleType", label: "Aina ya Pikipiki (Brand & Model)" });
+      }
+      if (!formData.motorcycleYear) {
+        motorcycleErrors.motorcycleYear = true;
+        missingMotorcycleFields.push({ field: "motorcycleYear", label: "Mwaka wa Uzalishaji" });
+      }
+      if (!formData.motorcycleEngineNumber) {
+        motorcycleErrors.motorcycleEngineNumber = true;
+        missingMotorcycleFields.push({ field: "motorcycleEngineNumber", label: "Namba ya Engine" });
+      }
+      if (!formData.motorcycleChassisNumber) {
+        motorcycleErrors.motorcycleChassisNumber = true;
+        missingMotorcycleFields.push({ field: "motorcycleChassisNumber", label: "Namba ya Chassis" });
+      }
+      if (!formData.motorcycleColor) {
+        motorcycleErrors.motorcycleColor = true;
+        missingMotorcycleFields.push({ field: "motorcycleColor", label: "Rangi ya Pikipiki" });
+      }
+
+      if (missingMotorcycleFields.length > 0) {
+        setValidationErrors({ ...errors, ...motorcycleErrors });
+        
+        // Scroll to first missing motorcycle field
+        const firstMissingField = missingMotorcycleFields[0].field;
+        if (fieldRefs[firstMissingField]?.current) {
+          fieldRefs[firstMissingField].current.scrollIntoView({ 
+            behavior: "smooth", 
+            block: "center" 
+          });
+          fieldRefs[firstMissingField].current.focus();
+        }
+        
         alert(
           "❌ TAARIFA ZA PIKIPIKI ZIMEKOSEKANA!\n\n" +
-          "Tafadhali jaza:\n" +
-          (!formData.motorcycleType ? "• Aina ya Pikipiki (Brand & Model)\n" : "") +
-          (!formData.motorcycleYear ? "• Mwaka wa Uzalishaji\n" : "") +
-          (!formData.motorcycleEngineNumber ? "• Namba ya Engine\n" : "") +
-          (!formData.motorcycleChassisNumber ? "• Namba ya Chassis\n" : "") +
-          (!formData.motorcycleColor ? "• Rangi ya Pikipiki\n" : "")
+            "Tafadhali jaza:\n" +
+            missingMotorcycleFields.map(f => `• ${f.label}`).join("\n")
         );
         setLoading(false);
         return;
       }
+
+      // Clear validation errors if all fields are filled
+      setValidationErrors({});
 
       // Create or reuse customer/supplier first
       let partyId = selectedParty?.id || selectedParty?._id;
@@ -829,9 +895,9 @@ const ContractForms = () => {
 
       // Show detailed and helpful error message
       let friendlyMessage = "❌ IMESHINDWA KUUNDA MKATABA!\n\n";
-      
-      if (errorDetails && typeof errorDetails === 'string') {
-        if (errorDetails.includes('[object Object]')) {
+
+      if (errorDetails && typeof errorDetails === "string") {
+        if (errorDetails.includes("[object Object]")) {
           friendlyMessage += "Kuna taarifa zisizo sahihi. Tafadhali angalia:\n";
           friendlyMessage += "• Jina la Mteja/Muuzaji limejazwa?\n";
           friendlyMessage += "• Simu imejazwa?\n";
@@ -949,13 +1015,18 @@ const ContractForms = () => {
               Taarifa za {contractType === "sale" ? "Mnunuzi" : "Muuzaji"}
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
+              <ValidatedInput
+                ref={partyNameRef}
                 label="Jina"
+                name="partyName"
                 value={formData.partyName}
                 onChange={(e) =>
                   setFormData({ ...formData, partyName: e.target.value })
                 }
+                error={validationErrors.partyName}
+                errorMessage="Jaza jina la mnunuzi/muuzaji"
                 required
+                placeholder="Mfano: John Doe"
               />
               <Input
                 label="TIN Number"
@@ -964,21 +1035,31 @@ const ContractForms = () => {
                   setFormData({ ...formData, partyTIN: e.target.value })
                 }
               />
-              <Input
+              <ValidatedInput
+                ref={partyPhoneRef}
                 label="Namba ya Simu"
+                name="partyPhone"
                 value={formData.partyPhone}
                 onChange={(e) =>
                   setFormData({ ...formData, partyPhone: e.target.value })
                 }
+                error={validationErrors.partyPhone}
+                errorMessage="Jaza namba ya simu"
                 required
+                placeholder="Mfano: 0712345678"
               />
-              <Input
+              <ValidatedInput
+                ref={partyAddressRef}
                 label="Makazi"
+                name="partyAddress"
                 value={formData.partyAddress}
                 onChange={(e) =>
                   setFormData({ ...formData, partyAddress: e.target.value })
                 }
+                error={validationErrors.partyAddress}
+                errorMessage="Jaza makazi"
                 required
+                placeholder="Mfano: Kinondoni, DSM"
               />
               <Select
                 label="Aina ya Kitambulisho"
@@ -1079,12 +1160,16 @@ const ContractForms = () => {
                     : ""
                 }
               />
-              <Input
+              <ValidatedInput
+                ref={motorcycleTypeRef}
                 label="Aina (Brand/Model)"
+                name="motorcycleType"
                 value={formData.motorcycleType}
                 onChange={(e) =>
                   setFormData({ ...formData, motorcycleType: e.target.value })
                 }
+                error={validationErrors.motorcycleType}
+                errorMessage="Jaza aina ya pikipiki"
                 required
                 disabled={
                   contractType === "sale" &&
@@ -1096,9 +1181,12 @@ const ContractForms = () => {
                     ? "bg-gray-100"
                     : ""
                 }
+                placeholder="Mfano: Honda CB150"
               />
-              <Input
+              <ValidatedInput
+                ref={motorcycleYearRef}
                 label="Mwaka"
+                name="motorcycleYear"
                 type="number"
                 value={formData.motorcycleYear}
                 onChange={(e) =>
@@ -1107,6 +1195,8 @@ const ContractForms = () => {
                     motorcycleYear: e.target.value,
                   })
                 }
+                error={validationErrors.motorcycleYear}
+                errorMessage="Jaza mwaka wa uzalishaji"
                 required
                 disabled={
                   contractType === "sale" &&
@@ -1118,9 +1208,12 @@ const ContractForms = () => {
                     ? "bg-gray-100"
                     : ""
                 }
+                placeholder="Mfano: 2020"
               />
-              <Input
+              <ValidatedInput
+                ref={motorcycleEngineRef}
                 label="Engine Number"
+                name="motorcycleEngineNumber"
                 value={formData.motorcycleEngineNumber}
                 onChange={(e) =>
                   setFormData({
@@ -1128,6 +1221,8 @@ const ContractForms = () => {
                     motorcycleEngineNumber: e.target.value,
                   })
                 }
+                error={validationErrors.motorcycleEngineNumber}
+                errorMessage="Jaza namba ya engine"
                 required
                 disabled={
                   contractType === "sale" &&
@@ -1139,9 +1234,12 @@ const ContractForms = () => {
                     ? "bg-gray-100"
                     : ""
                 }
+                placeholder="Mfano: CB150-12345"
               />
-              <Input
+              <ValidatedInput
+                ref={motorcycleChassisRef}
                 label="Chassis Number"
+                name="motorcycleChassisNumber"
                 value={formData.motorcycleChassisNumber}
                 onChange={(e) =>
                   setFormData({
@@ -1149,6 +1247,8 @@ const ContractForms = () => {
                     motorcycleChassisNumber: e.target.value,
                   })
                 }
+                error={validationErrors.motorcycleChassisNumber}
+                errorMessage="Jaza namba ya chassis"
                 required
                 disabled={
                   contractType === "sale" &&
@@ -1160,13 +1260,18 @@ const ContractForms = () => {
                     ? "bg-gray-100"
                     : ""
                 }
+                placeholder="Mfano: CH-12345"
               />
-              <Input
+              <ValidatedInput
+                ref={motorcycleColorRef}
                 label="Rangi"
+                name="motorcycleColor"
                 value={formData.motorcycleColor}
                 onChange={(e) =>
                   setFormData({ ...formData, motorcycleColor: e.target.value })
                 }
+                error={validationErrors.motorcycleColor}
+                errorMessage="Jaza rangi ya pikipiki"
                 required
                 disabled={
                   contractType === "sale" &&
@@ -1178,6 +1283,7 @@ const ContractForms = () => {
                     ? "bg-gray-100"
                     : ""
                 }
+                placeholder="Mfano: Red"
               />
             </div>
           </div>
