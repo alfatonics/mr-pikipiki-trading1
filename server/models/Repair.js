@@ -20,18 +20,20 @@ class Repair {
       workDescription,
       issuesFound,
       recommendations,
+      inspectionItemCosts = [],
     } = data;
 
     const sql = `
       INSERT INTO repairs (motorcycle_id, mechanic_id, inspection_id, description, repair_type, start_date,
                           completion_date, status, labor_cost, labor_hours, total_cost, notes,
-                          details_registered, details_approval_id, work_description, issues_found, recommendations)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                          details_registered, details_approval_id, work_description, issues_found, recommendations, inspection_item_costs)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING id, motorcycle_id as "motorcycleId", mechanic_id as "mechanicId", inspection_id as "inspectionId",
                 description, repair_type as "repairType", start_date as "startDate", completion_date as "completionDate",
                 status, labor_cost as "laborCost", labor_hours as "laborHours", total_cost as "totalCost",
                 notes, details_registered as "detailsRegistered", details_approval_id as "detailsApprovalId",
                 work_description as "workDescription", issues_found as "issuesFound", recommendations,
+                inspection_item_costs as "inspectionItemCosts",
                 created_at as "createdAt", updated_at as "updatedAt"
     `;
 
@@ -53,6 +55,7 @@ class Repair {
       workDescription,
       issuesFound,
       recommendations,
+      JSON.stringify(inspectionItemCosts || []),
     ]);
     return result.rows[0];
   }
@@ -71,6 +74,16 @@ class Repair {
     const result = await query(sql, [id]);
     if (result.rows[0]) {
       const row = result.rows[0];
+
+      // Parse inspection_item_costs if it's a string
+      let inspectionItemCosts = [];
+      if (row.inspection_item_costs) {
+        inspectionItemCosts =
+          typeof row.inspection_item_costs === "string"
+            ? JSON.parse(row.inspection_item_costs)
+            : row.inspection_item_costs;
+      }
+
       return {
         id: row.id,
         motorcycleId: row.motorcycle_id,
@@ -90,6 +103,7 @@ class Repair {
         workDescription: row.work_description,
         issuesFound: row.issues_found,
         recommendations: row.recommendations,
+        inspectionItemCosts: inspectionItemCosts,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         motorcycleChassisNumber: row.motorcycleChassisNumber,
@@ -160,12 +174,19 @@ class Repair {
       issuesFound: "issues_found",
       recommendations: "recommendations",
       proofOfWork: "proof_of_work",
+      inspectionItemCosts: "inspection_item_costs",
     };
 
     for (const [jsKey, dbKey] of Object.entries(fieldMap)) {
       if (updateData[jsKey] !== undefined) {
-        fields.push(`${dbKey} = $${paramCount}`);
-        values.push(updateData[jsKey]);
+        // JSON stringify for JSONB fields
+        if (jsKey === "inspectionItemCosts") {
+          fields.push(`${dbKey} = $${paramCount}`);
+          values.push(JSON.stringify(updateData[jsKey]));
+        } else {
+          fields.push(`${dbKey} = $${paramCount}`);
+          values.push(updateData[jsKey]);
+        }
         paramCount++;
       }
     }

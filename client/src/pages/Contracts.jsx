@@ -103,7 +103,7 @@ const Contracts = () => {
       const response = await retryRequest(() =>
         axios.get("/api/contracts", {
           params,
-          timeout: 10000,
+          timeout: 60000, // Increased to 60 seconds for large datasets
         })
       );
 
@@ -483,11 +483,21 @@ const Contracts = () => {
     },
     {
       header: "Motorcycle",
-      render: (row) => `${row.motorcycle?.brand} ${row.motorcycle?.model}`,
+      render: (row) => {
+        const brand = row.motorcycleBrand || row.motorcycle?.brand || "N/A";
+        const model = row.motorcycleModel || row.motorcycle?.model || "";
+        return `${brand} ${model}`.trim() || "N/A";
+      },
     },
     {
       header: "Party",
-      render: (row) => row.party?.name || row.party?.fullName || "N/A",
+      render: (row) => {
+        // Try to get party name from different sources
+        if (row.party?.name) return row.party.name;
+        if (row.party?.fullName) return row.party.fullName;
+        // If no party object, we can't display the name
+        return "N/A";
+      },
     },
     {
       header: "Amount",
@@ -589,6 +599,15 @@ const Contracts = () => {
               <FiDollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
+          {isAdmin && row.type === "sale" && row.status !== "completed" && (
+            <button
+              onClick={() => handleApproveSalesContract(row)}
+              className="p-1 sm:p-0 text-green-600 hover:text-green-800 transition-colors"
+              title="Approve Sales Contract"
+            >
+              <FiCheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -610,6 +629,52 @@ const Contracts = () => {
       alert(
         error.response?.data?.error ||
           "Failed to approve contract. Please check all inspections and payments are completed."
+      );
+    }
+  };
+
+  const handleApproveSalesContract = async (contract) => {
+    if (
+      !window.confirm(
+        `Je, una uhakika unataka kuapprove sales contract ${contract.contractNumber}?\n\n` +
+          `Hii itafanya:\n` +
+          `1. Pikipiki imekwa "sold" kwenye stock\n` +
+          `2. Faida itahesabika automatically\n` +
+          `3. Kama kuna deni, itaenda kwa cashier\n` +
+          `4. Customer records zitasasishwa`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `/api/contracts/${contract._id}/approve-sales-contract`
+      );
+
+      alert(
+        `Sales contract approved successfully!\n\n` +
+          `Profit: TZS ${parseFloat(
+            response.data.profit || 0
+          ).toLocaleString()}\n` +
+          `Amount Paid: TZS ${parseFloat(
+            response.data.amountPaid || 0
+          ).toLocaleString()}\n` +
+          (response.data.remainingBalance > 0
+            ? `Remaining Balance: TZS ${parseFloat(
+                response.data.remainingBalance
+              ).toLocaleString()} (Sent to cashier)\n`
+            : ``) +
+          `Motorcycle status: SOLD`
+      );
+
+      fetchContracts();
+    } catch (error) {
+      console.error("Error approving sales contract:", error);
+      alert(
+        error.response?.data?.error ||
+          error.response?.data?.details ||
+          "Failed to approve sales contract. Please try again."
       );
     }
   };

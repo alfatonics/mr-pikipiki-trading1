@@ -57,7 +57,8 @@ class Customer {
   static async findById(id) {
     const sql = `
       SELECT id, full_name as "fullName", phone, email, id_type as "idType", id_number as "idNumber",
-             address, city, region, occupation, total_purchases as "totalPurchases", notes,
+             address, city, region, occupation, total_purchases as "totalPurchases", 
+             total_spent as "totalSpent", last_purchase_date as "lastPurchaseDate", notes,
              budget_range as "budgetRange", preferred_currency as "preferredCurrency",
              credit_limit as "creditLimit", payment_terms as "paymentTerms", sales_notes as "salesNotes",
              created_at as "createdAt", updated_at as "updatedAt"
@@ -72,7 +73,8 @@ class Customer {
   static async findAll(filters = {}) {
     let sql = `
       SELECT id, full_name as "fullName", phone, email, id_type as "idType", id_number as "idNumber",
-             address, city, region, occupation, total_purchases as "totalPurchases", notes,
+             address, city, region, occupation, total_purchases as "totalPurchases",
+             total_spent as "totalSpent", last_purchase_date as "lastPurchaseDate", notes,
              budget_range as "budgetRange", preferred_currency as "preferredCurrency",
              credit_limit as "creditLimit", payment_terms as "paymentTerms", sales_notes as "salesNotes",
              created_at as "createdAt", updated_at as "updatedAt"

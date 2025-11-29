@@ -194,26 +194,66 @@ router.post(
       const recommendations = req.body.recommendations || "";
       const proofOfWork = req.file ? `/uploads/${req.file.filename}` : null;
 
-      // Calculate total cost
+      // NEW: Parse inspection item costs (itemized costs per inspection item)
+      const inspectionItemCosts = JSON.parse(
+        req.body.inspectionItemCosts || "[]"
+      );
+
+      // Calculate total cost from inspection items if provided
+      let itemizedTotalCost = 0;
+      if (inspectionItemCosts && inspectionItemCosts.length > 0) {
+        inspectionItemCosts.forEach((item) => {
+          // Sum spare parts cost for this item
+          const itemSparePartsCost = (item.spareParts || []).reduce(
+            (sum, part) =>
+              sum +
+              (parseFloat(part.cost) || 0) * (parseInt(part.quantity) || 1),
+            0
+          );
+          // Add labor cost for this item
+          const itemLaborCost = parseFloat(item.laborCost) || 0;
+          itemizedTotalCost += itemSparePartsCost + itemLaborCost;
+        });
+      }
+
+      // Calculate total cost (use itemized if available, otherwise fallback to general)
       const sparePartsCost = spareParts.reduce(
         (sum, part) =>
           sum + (parseFloat(part.cost) || 0) * (parseInt(part.quantity) || 1),
         0
       );
-      const totalCost = laborCost + sparePartsCost;
+      const totalCost =
+        itemizedTotalCost > 0 ? itemizedTotalCost : laborCost + sparePartsCost;
 
-      // Update spare parts
-      await Repair.clearSpareParts(req.params.id);
-      for (const part of spareParts) {
-        if (part.name && part.cost > 0) {
-          await Repair.addSparePart(req.params.id, part);
+      // Update spare parts (only if not using itemized approach)
+      if (!inspectionItemCosts || inspectionItemCosts.length === 0) {
+        await Repair.clearSpareParts(req.params.id);
+        for (const part of spareParts) {
+          if (part.name && part.cost > 0) {
+            await Repair.addSparePart(req.params.id, part);
+          }
+        }
+      } else {
+        // If using itemized costs, still save general spare parts for compatibility
+        await Repair.clearSpareParts(req.params.id);
+        // Collect all spare parts from all items
+        const allSpareParts = [];
+        inspectionItemCosts.forEach((item) => {
+          if (item.spareParts && item.spareParts.length > 0) {
+            allSpareParts.push(...item.spareParts);
+          }
+        });
+        for (const part of allSpareParts) {
+          if (part.name && part.cost > 0) {
+            await Repair.addSparePart(req.params.id, part);
+          }
         }
       }
 
-      // Update repair
+      // Update repair with inspection item costs
       await Repair.update(req.params.id, {
         laborHours,
-        laborCost,
+        laborCost: itemizedTotalCost > 0 ? 0 : laborCost, // Set to 0 if using itemized
         totalCost,
         workDescription,
         issuesFound,
@@ -221,6 +261,7 @@ router.post(
         detailsRegistered: true,
         status: "awaiting_details_approval",
         proofOfWork,
+        inspectionItemCosts,
       });
 
       const updatedRepair = await Repair.findById(req.params.id);

@@ -66,59 +66,19 @@ router.get("/", authenticate, async (req, res) => {
       return;
     }
 
+    // Add default LIMIT to prevent timeout on large datasets
+    // Frontend should implement pagination if more contracts are needed
+    filter.limit = 200; // Limit to 200 most recent contracts
+
     const contracts = await Contract.findAll(filter);
 
-    // Limit population to prevent timeout - only populate first 100 contracts
-    // If more are needed, implement pagination
-    const contractsToPopulate = contracts.slice(0, 100);
-    const remainingContracts = contracts.slice(100);
+    // Return contracts with _id for frontend compatibility
+    const simplifiedContracts = contracts.map((contract) => ({
+      ...contract,
+      _id: contract.id,
+    }));
 
-    // Populate party and motorcycle data for contracts (limited to prevent timeout)
-    const populatedContracts = await Promise.all(
-      contractsToPopulate.map(async (contract) => {
-        const populated = { ...contract };
-
-        // Get motorcycle data
-        if (contract.motorcycleId) {
-          try {
-            const motorcycle = await Motorcycle.findById(contract.motorcycleId);
-            populated.motorcycle = motorcycle || null;
-          } catch (err) {
-            console.error(
-              `Error fetching motorcycle ${contract.motorcycleId}:`,
-              err
-            );
-            populated.motorcycle = null;
-          }
-        }
-
-        // Get party data (customer or supplier)
-        if (contract.partyId && contract.partyModel) {
-          try {
-            if (contract.partyModel === "Customer") {
-              const customer = await Customer.findById(contract.partyId);
-              populated.party = customer || null;
-            } else if (contract.partyModel === "Supplier") {
-              const supplier = await Supplier.findById(contract.partyId);
-              populated.party = supplier || null;
-            }
-          } catch (err) {
-            console.error(`Error fetching party ${contract.partyId}:`, err);
-            populated.party = null;
-          }
-        }
-
-        // Ensure _id is set for frontend compatibility
-        populated._id = contract.id;
-
-        return populated;
-      })
-    );
-
-    // Add remaining contracts without full population
-    const allContracts = [...populatedContracts, ...remainingContracts];
-
-    res.json(allContracts);
+    res.json(simplifiedContracts);
   } catch (error) {
     console.error("Contracts API error:", error);
     res.status(500).json({ error: "Failed to fetch contracts" });
@@ -609,6 +569,172 @@ router.post(
       res
         .status(500)
         .json({ error: "Failed to approve contract and create motorcycle" });
+    }
+  }
+);
+
+// Admin approve sales contract
+router.post(
+  "/:id/approve-sales-contract",
+  authenticate,
+  authorize("admin"),
+  async (req, res) => {
+    try {
+      const contract = await Contract.findById(req.params.id);
+
+      if (!contract) {
+        return res.status(404).json({ error: "Contract not found" });
+      }
+
+      // Check if contract is sale type
+      if (contract.type !== "sale") {
+        return res.status(400).json({
+          error: "Only sales contracts can be approved using this endpoint",
+        });
+      }
+
+      // Check if motorcycle exists
+      if (!contract.motorcycleId) {
+        return res.status(400).json({ error: "Motorcycle ID is required" });
+      }
+
+      const motorcycle = await Motorcycle.findById(contract.motorcycleId);
+      if (!motorcycle) {
+        return res.status(404).json({ error: "Motorcycle not found" });
+      }
+
+      // Check if motorcycle is available for sale
+      if (motorcycle.status !== "in_stock") {
+        return res.status(400).json({
+          error: `Motorcycle is not available for sale. Current status: ${motorcycle.status}`,
+        });
+      }
+
+      // Get customer details
+      if (!contract.partyId || contract.partyModel !== "Customer") {
+        return res
+          .status(400)
+          .json({ error: "Customer information is required" });
+      }
+
+      const customer = await Customer.findById(contract.partyId);
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+
+      // Parse notes to get sale details
+      let saleDetails = {};
+      try {
+        if (contract.notes && typeof contract.notes === "string") {
+          const parsedNotes = JSON.parse(contract.notes);
+          saleDetails = parsedNotes.saleTerms || {};
+        }
+      } catch (e) {
+        console.warn("Could not parse contract notes:", e);
+      }
+
+      const salePrice = parseFloat(
+        saleDetails.salePrice || contract.amount || 0
+      );
+      const amountPaid = parseFloat(saleDetails.amountPaid || 0);
+      const remainingBalance = parseFloat(
+        saleDetails.remainingBalance || salePrice - amountPaid
+      );
+
+      // Calculate profit (sale price - motorcycle cost)
+      const motorcycleCost = parseFloat(
+        motorcycle.priceIn ||
+          motorcycle.totalCost ||
+          motorcycle.purchasePrice ||
+          0
+      );
+      const profit = salePrice - motorcycleCost;
+
+      // Update motorcycle status to 'sold' and record customer
+      await Motorcycle.update(contract.motorcycleId, {
+        status: "sold",
+        customerId: contract.partyId,
+        saleDate: new Date().toISOString().split("T")[0],
+        sellingPrice: salePrice,
+        priceOut: salePrice,
+        profit: profit,
+      });
+
+      // Update contract status to 'completed'
+      await Contract.update(contract.id, {
+        status: "completed",
+      });
+
+      // Update customer's purchase history
+      await query(
+        `UPDATE customers 
+         SET total_purchases = COALESCE(total_purchases, 0) + 1,
+             total_spent = COALESCE(total_spent, 0) + $1,
+             last_purchase_date = $2,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [salePrice, new Date().toISOString().split("T")[0], contract.partyId]
+      );
+
+      // If there's remaining balance (debt), create a loan record
+      let loan = null;
+      if (remainingBalance > 0) {
+        const Loan = (await import("../models/Loan.js")).default;
+
+        loan = await Loan.create({
+          customerId: contract.partyId,
+          motorcycleId: contract.motorcycleId,
+          contractId: contract.id,
+          totalAmount: salePrice,
+          amountPaid: amountPaid,
+          remainingBalance: remainingBalance,
+          status: "active",
+          dueDate: saleDetails.dueDate || null,
+          notes: saleDetails.balanceReason || "Deni kutoka mauzo ya pikipiki",
+        });
+
+        console.log(
+          `✅ Loan created for customer: loanId=${loan.id}, balance=${remainingBalance}`
+        );
+      }
+
+      // Create finance transaction for the sale
+      const FinanceTransaction = (
+        await import("../models/FinanceTransaction.js")
+      ).default;
+
+      await FinanceTransaction.create({
+        type: "income",
+        category: "motorcycle_sale",
+        amount: amountPaid, // Only record what was actually paid
+        description: `Mauzo ya pikipiki ${motorcycle.brand} ${motorcycle.model} - ${contract.contractNumber}`,
+        paymentMethod: contract.paymentMethod || "cash",
+        referenceNumber: contract.contractNumber,
+        motorcycleId: contract.motorcycleId,
+        customerId: contract.partyId,
+        contractId: contract.id,
+        recordedBy: req.user.id,
+      });
+
+      console.log(
+        `✅ Sales contract approved: contractId=${contract.id}, profit=${profit}`
+      );
+
+      res.json({
+        message: "Sales contract approved successfully",
+        contract: await Contract.findById(contract.id),
+        motorcycle: await Motorcycle.findById(contract.motorcycleId),
+        loan: loan,
+        profit: profit,
+        amountPaid: amountPaid,
+        remainingBalance: remainingBalance,
+      });
+    } catch (error) {
+      console.error("Error approving sales contract:", error);
+      res.status(500).json({
+        error: "Failed to approve sales contract",
+        details: error.message,
+      });
     }
   }
 );
