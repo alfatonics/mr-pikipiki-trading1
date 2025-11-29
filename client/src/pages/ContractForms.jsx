@@ -482,7 +482,13 @@ const ContractForms = () => {
         !formData.partyPhone ||
         !formData.partyAddress
       ) {
-        alert("Tafadhali jaza taarifa za mteja (jina, simu, makazi)");
+        alert(
+          "❌ TAARIFA ZA MTEJA/MNUNUZI ZIMEKOSEKANA!\n\n" +
+          "Tafadhali jaza:\n" +
+          (!formData.partyName ? "• Jina la Mnunuzi/Muuzaji\n" : "") +
+          (!formData.partyPhone ? "• Simu ya Mnunuzi/Muuzaji\n" : "") +
+          (!formData.partyAddress ? "• Makazi ya Mnunuzi/Muuzaji\n" : "")
+        );
         setLoading(false);
         return;
       }
@@ -494,7 +500,15 @@ const ContractForms = () => {
         !formData.motorcycleChassisNumber ||
         !formData.motorcycleColor
       ) {
-        alert("Tafadhali jaza taarifa zote za pikipiki");
+        alert(
+          "❌ TAARIFA ZA PIKIPIKI ZIMEKOSEKANA!\n\n" +
+          "Tafadhali jaza:\n" +
+          (!formData.motorcycleType ? "• Aina ya Pikipiki (Brand & Model)\n" : "") +
+          (!formData.motorcycleYear ? "• Mwaka wa Uzalishaji\n" : "") +
+          (!formData.motorcycleEngineNumber ? "• Namba ya Engine\n" : "") +
+          (!formData.motorcycleChassisNumber ? "• Namba ya Chassis\n" : "") +
+          (!formData.motorcycleColor ? "• Rangi ya Pikipiki\n" : "")
+        );
         setLoading(false);
         return;
       }
@@ -813,13 +827,25 @@ const ContractForms = () => {
       console.error("Full error response:", error.response?.data);
       console.error("Error details:", errorDetails);
 
-      // Show more detailed error message in development
-      const fullMessage =
-        process.env.NODE_ENV === "development" && errorDetails
-          ? `${errorMessage}\n\nDetails: ${errorDetails}`
-          : errorMessage;
+      // Show detailed and helpful error message
+      let friendlyMessage = "❌ IMESHINDWA KUUNDA MKATABA!\n\n";
+      
+      if (errorDetails && typeof errorDetails === 'string') {
+        if (errorDetails.includes('[object Object]')) {
+          friendlyMessage += "Kuna taarifa zisizo sahihi. Tafadhali angalia:\n";
+          friendlyMessage += "• Jina la Mteja/Muuzaji limejazwa?\n";
+          friendlyMessage += "• Simu imejazwa?\n";
+          friendlyMessage += "• Makazi yamejazwa?\n";
+          friendlyMessage += "• Namba ya Engine na Chassis zimejazwa?\n\n";
+          friendlyMessage += "Hakikisha umejaza taarifa zote kwa usahihi.";
+        } else {
+          friendlyMessage += errorDetails;
+        }
+      } else {
+        friendlyMessage += errorMessage;
+      }
 
-      alert(`Imeshindwa kuunda mkataba: ${fullMessage}`);
+      alert(friendlyMessage);
     } finally {
       setLoading(false);
     }
