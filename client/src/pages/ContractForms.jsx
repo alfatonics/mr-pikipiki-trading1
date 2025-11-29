@@ -26,7 +26,7 @@ const ContractForms = () => {
 
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
-  
+
   // Refs for scrolling to invalid fields
   const partyNameRef = useRef(null);
   const partyPhoneRef = useRef(null);
@@ -36,7 +36,7 @@ const ContractForms = () => {
   const motorcycleEngineRef = useRef(null);
   const motorcycleChassisRef = useRef(null);
   const motorcycleColorRef = useRef(null);
-  
+
   const [formData, setFormData] = useState({
     // Company info (MR PIKIPIKI TRADING)
     companyRegistration: "518309",
@@ -492,38 +492,47 @@ const ContractForms = () => {
       // Validate required fields
       const errors = {};
       const missingFields = [];
-      
+
       // Check party fields
       if (!formData.partyName) {
         errors.partyName = true;
-        missingFields.push({ field: "partyName", label: "Jina la Mnunuzi/Muuzaji" });
+        missingFields.push({
+          field: "partyName",
+          label: "Jina la Mnunuzi/Muuzaji",
+        });
       }
       if (!formData.partyPhone) {
         errors.partyPhone = true;
-        missingFields.push({ field: "partyPhone", label: "Simu ya Mnunuzi/Muuzaji" });
+        missingFields.push({
+          field: "partyPhone",
+          label: "Simu ya Mnunuzi/Muuzaji",
+        });
       }
       if (!formData.partyAddress) {
         errors.partyAddress = true;
-        missingFields.push({ field: "partyAddress", label: "Makazi ya Mnunuzi/Muuzaji" });
+        missingFields.push({
+          field: "partyAddress",
+          label: "Makazi ya Mnunuzi/Muuzaji",
+        });
       }
 
       if (missingFields.length > 0) {
         setValidationErrors(errors);
-        
+
         // Scroll to first missing field
         const firstMissingField = missingFields[0].field;
         if (fieldRefs[firstMissingField]?.current) {
-          fieldRefs[firstMissingField].current.scrollIntoView({ 
-            behavior: "smooth", 
-            block: "center" 
+          fieldRefs[firstMissingField].current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
           });
           fieldRefs[firstMissingField].current.focus();
         }
-        
+
         alert(
           "❌ TAARIFA ZA MTEJA/MNUNUZI ZIMEKOSEKANA!\n\n" +
             "Tafadhali jaza:\n" +
-            missingFields.map(f => `• ${f.label}`).join("\n")
+            missingFields.map((f) => `• ${f.label}`).join("\n")
         );
         setLoading(false);
         return;
@@ -532,45 +541,60 @@ const ContractForms = () => {
       // Check motorcycle fields
       const motorcycleErrors = {};
       const missingMotorcycleFields = [];
-      
+
       if (!formData.motorcycleType) {
         motorcycleErrors.motorcycleType = true;
-        missingMotorcycleFields.push({ field: "motorcycleType", label: "Aina ya Pikipiki (Brand & Model)" });
+        missingMotorcycleFields.push({
+          field: "motorcycleType",
+          label: "Aina ya Pikipiki (Brand & Model)",
+        });
       }
       if (!formData.motorcycleYear) {
         motorcycleErrors.motorcycleYear = true;
-        missingMotorcycleFields.push({ field: "motorcycleYear", label: "Mwaka wa Uzalishaji" });
+        missingMotorcycleFields.push({
+          field: "motorcycleYear",
+          label: "Mwaka wa Uzalishaji",
+        });
       }
       if (!formData.motorcycleEngineNumber) {
         motorcycleErrors.motorcycleEngineNumber = true;
-        missingMotorcycleFields.push({ field: "motorcycleEngineNumber", label: "Namba ya Engine" });
+        missingMotorcycleFields.push({
+          field: "motorcycleEngineNumber",
+          label: "Namba ya Engine",
+        });
       }
       if (!formData.motorcycleChassisNumber) {
         motorcycleErrors.motorcycleChassisNumber = true;
-        missingMotorcycleFields.push({ field: "motorcycleChassisNumber", label: "Namba ya Chassis" });
+        missingMotorcycleFields.push({
+          field: "motorcycleChassisNumber",
+          label: "Namba ya Chassis",
+        });
       }
       if (!formData.motorcycleColor) {
         motorcycleErrors.motorcycleColor = true;
-        missingMotorcycleFields.push({ field: "motorcycleColor", label: "Rangi ya Pikipiki" });
+        missingMotorcycleFields.push({
+          field: "motorcycleColor",
+          label: "Rangi ya Pikipiki",
+        });
       }
 
       if (missingMotorcycleFields.length > 0) {
         setValidationErrors({ ...errors, ...motorcycleErrors });
-        
+
         // Scroll to first missing motorcycle field
         const firstMissingField = missingMotorcycleFields[0].field;
         if (fieldRefs[firstMissingField]?.current) {
-          fieldRefs[firstMissingField].current.scrollIntoView({ 
-            behavior: "smooth", 
-            block: "center" 
+          fieldRefs[firstMissingField].current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
           });
           fieldRefs[firstMissingField].current.focus();
         }
-        
+
         alert(
           "❌ TAARIFA ZA PIKIPIKI ZIMEKOSEKANA!\n\n" +
             "Tafadhali jaza:\n" +
-            missingMotorcycleFields.map(f => `• ${f.label}`).join("\n")
+            missingMotorcycleFields.map((f) => `• ${f.label}`).join("\n")
         );
         setLoading(false);
         return;
